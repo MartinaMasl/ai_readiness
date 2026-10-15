@@ -1,0 +1,160 @@
+{
+  "version": "0.1",
+  "rules": {
+    "score_values": "Each subdimension receives one whole number from 0 to 5.",
+    "max_follow_ups": 2,
+    "mixed_evidence": "Choose the level that fits best overall. If the evidence sits between two levels, choose the lower one.",
+    "plans": "Score the current state. Plans and intentions do not count.",
+    "insufficient_evidence": "If there is evidence for at least one criterion, score on that evidence and set the flag 'insufficient_evidence'. If there is no evidence at all, return no score; the subdimension is left out of the dimension mean."
+  },
+  "scale": {
+    "0": {
+      "name": "No capability",
+      "description": "The organization demonstrates no meaningful capability in this area. Relevant practices, structures, or resources are absent, and the area has not yet been recognized as requiring attention."
+    },
+    "1": {
+      "name": "Initial/Ad Hoc",
+      "description": "Capability exists only in an unstructured, inconsistent form, typically dependent on individual initiative rather than organizational practice. Outcomes are unpredictable and vary significantly across the organization."
+    },
+    "2": {
+      "name": "Repeatable",
+      "description": "Basic practices are established and can be repeated, but they are not consistently applied across the organization. Capability tends to be confined to specific individuals, teams, or informal arrangements rather than being organization-wide."
+    },
+    "3": {
+      "name": "Defined",
+      "description": "Practices are formally documented, standardized, and consistently applied across the organization. Responsibilities are clearly assigned, and the capability no longer depends on specific individuals."
+    },
+    "4": {
+      "name": "Managed",
+      "description": "Defined practices are actively monitored, measured, and controlled against established performance indicators. The organization can identify and respond to deviations, and the capability is actively governed rather than simply maintained."
+    },
+    "5": {
+      "name": "Optimized",
+      "description": "The capability is continuously and systematically improved, supported by advanced tools, methodologies, and feedback mechanisms. Performance is not only monitored but actively used to drive ongoing refinement and innovation."
+    }
+  },
+  "dimensions": [
+    {
+      "name": "Data",
+      "definition": "The extent to which an organization's data assets are available, accessible, governed, and of sufficient quality to support AI applications.",
+      "report_levels": {
+        "0": "Overall, no meaningful data capability for AI is in place, and the area has not yet been recognized as needing attention.",
+        "1": "Overall, data practices exist only in an unstructured form that depends on individual initiative, so results are unpredictable and vary across the organization.",
+        "2": "Overall, basic data practices exist and can be repeated, but they are confined to individual teams and are not applied across the organization.",
+        "3": "Overall, data practices are documented, standardized and applied consistently across the organization, with clearly assigned responsibilities.",
+        "4": "Overall, data practices are actively monitored and measured against defined indicators, and deviations are identified and corrected.",
+        "5": "Overall, data practices are continuously and systematically improved, supported by advanced tools and feedback."
+      },
+      "subdimensions": [
+        {
+          "name": "Discoverability",
+          "definition": "The extent to which employees can locate the data relevant to their work.",
+          "opening_question": "When someone in your organization needs data for their work, how do they find out what data exists and where it is?",
+          "criteria": [
+            {
+              "id": "mechanism",
+              "description": "How data is found: through a system, through lists, by asking colleagues, or not at all.",
+              "look_for": "Mentions of a data catalog, a central inventory, team lists, asking colleagues, searching folders, or having no way to find data."
+            },
+            {
+              "id": "reliability",
+              "description": "How much effort finding data takes and how predictable the outcome is.",
+              "look_for": "Time spent searching, whether people usually find what they need, and whether this differs from case to case."
+            },
+            {
+              "id": "dependence",
+              "description": "Whether finding data depends on knowing the right person.",
+              "look_for": "Reliance on specific colleagues, what happens when they are away or leave, and whether it works the same in every team."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether the way of finding data is maintained, monitored and improved.",
+              "look_for": "Someone responsible for keeping the catalog or inventory current, checks on coverage or outdated entries, and use of feedback to improve it. If no organization-wide mechanism exists, treat this criterion as covered."
+            }
+          ],
+          "levels": {
+            "0": "There is no functional way, formal or informal, for employees to locate the data required for their work. The need for one has not been recognized.",
+            "1": "Finding data depends on individual initiative and typically involves many inquiries or searching across scattered, disconnected sources. The effort and the outcome are unpredictable and vary significantly depending on who is searching and who is asked.",
+            "2": "Data can usually be found through established informal channels, such as asking a colleague known to be knowledgeable about a dataset, or through lists kept by individual teams. This works within teams but is not documented or applied across the organization, and it depends on specific individuals.",
+            "3": "Data is located through a documented, organization-wide mechanism, such as a data catalog or central inventory, with standard procedures and clearly defined contact points. Finding data no longer depends on personal knowledge or informal relationships.",
+            "4": "The organization-wide system for finding data is actively monitored and measured, for example through its coverage, how current its entries are, and how long employees need to find data. Gaps and outdated entries are identified and corrected, and responsibility for maintaining the system is assigned.",
+            "5": "The organization-wide system for finding data is continuously improved based on usage data and employee feedback, supported by advanced tooling such as automated metadata capture and search. Problems in finding data are used systematically to refine the system."
+          },
+          "examples": []
+        },
+        {
+          "name": "Ownership and Stewardship",
+          "definition": "The extent to which responsibility and accountability for data assets are clearly defined, assigned, and consistently applied across the organization.",
+          "opening_question": "Who is responsible for your organization's key datasets, and how is that decided?",
+          "criteria": [
+            {
+              "id": "assignment",
+              "description": "Whether someone is responsible for each dataset.",
+              "look_for": "Named roles, teams or people, responsibility taken only when a problem occurs, or statements that nobody is responsible."
+            },
+            {
+              "id": "documentation",
+              "description": "Whether ownership is formally assigned and recorded.",
+              "look_for": "A register, catalog entry, policy or role description that names owners, or the statement that nothing is written down."
+            },
+            {
+              "id": "consistency",
+              "description": "Whether ownership is handled the same way across the organization.",
+              "look_for": "One standard for all teams, or differences between teams and departments."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether ownership is reviewed, monitored and improved.",
+              "look_for": "Regular reviews of ownership records, tracking of datasets without an owner, handling of owners who leave, and use of feedback to improve the practice. If ownership is not formally assigned, treat this criterion as covered."
+            }
+          ],
+          "levels": {
+            "0": "There is no concept of data ownership within the organization. No individual or team is responsible for any dataset, formally or informally, and the need for ownership has not been recognized.",
+            "1": "No one clearly owns the data. Individuals take responsibility on their own initiative, typically only when a problem occurs, so whether a dataset is maintained is unpredictable.",
+            "2": "Within teams, it is generally known who owns a given dataset, usually because that person created it or uses it regularly. This ownership is not formally assigned or documented, and approaches differ between teams or departments.",
+            "3": "Data ownership is formally assigned and documented across the organization according to one standard. Responsibility for the accuracy, access, and maintenance of each dataset is unambiguous and is tied to roles, not to specific individuals.",
+            "4": "Ownership is actively monitored and measured, for example through the share of datasets with an assigned owner and regular reviews of ownership records. Gaps, such as datasets without an owner or owners who have left, are identified and corrected.",
+            "5": "Ownership practices are continuously improved based on monitoring results and feedback from owners and data users. Ownership is built into tools and processes, so that, for example, every new dataset is assigned an owner when it is created."
+          },
+          "examples": []
+        },
+        {
+          "name": "Quality",
+          "definition": "The extent to which data is sufficiently accurate, consistent, and prepared to support analytics and AI applications with minimal additional effort.",
+          "opening_question": "When someone wants to use your data for analysis or AI, what condition is it in, and what do they have to do before they can use it?",
+          "criteria": [
+            {
+              "id": "condition",
+              "description": "The state of the data and the effort needed before it can be used.",
+              "look_for": "Inaccurate, duplicate, invalid or conflicting records, differences between systems, and how much cleaning or preparation is needed."
+            },
+            {
+              "id": "rules",
+              "description": "Whether data quality rules exist and how widely they apply.",
+              "look_for": "No rules, informal rules within teams, or documented organization-wide rules with assigned responsibilities."
+            },
+            {
+              "id": "enforcement",
+              "description": "How quality rules are applied and enforced.",
+              "look_for": "Fixes by individuals when they notice a problem, repeated manual checks, or system controls such as required fields and validation checks."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether data quality is measured, monitored and improved.",
+              "look_for": "Quality metrics or thresholds, regular reporting, correction of deviations, fixing recurring problems at their source, and automated monitoring. If no organization-wide rules exist, treat this criterion as covered."
+            }
+          ],
+          "levels": {
+            "0": "There is no concept of data quality management within the organization, and the need for it has not been recognized. Data cannot reasonably be used for analytics or AI without a complete rebuild.",
+            "1": "Quality problems, such as inaccurate, duplicate, or conflicting records, are fixed by individuals when they notice them, usually for a single task. There are no quality rules, and data requires extensive manual cleaning before use.",
+            "2": "Some teams apply informal rules and repeat basic checks, such as for duplicates or invalid values, on their own datasets. These practices are not documented or applied across the organization, so quality differs between teams and combining data across systems still requires significant cleaning.",
+            "3": "Organization-wide quality rules covering accuracy, consistency, validity, uniqueness, and integrity are documented and applied consistently, with assigned responsibilities. Data can be used with limited preparation.",
+            "4": "Data quality is measured against defined thresholds for accuracy, consistency, validity, uniqueness, and integrity, and the results are monitored. Rules are enforced through system controls (e.g., required fields, validation checks), and deviations are identified and corrected.",
+            "5": "Data quality is continuously improved: measurement results are used to refine quality rules and controls, and recurring problems are fixed at their source. Monitoring is largely automated, and data can be used for analytics and AI without additional preparation."
+          },
+          "examples": []
+        }
+      ]
+    }
+  ]
+}
