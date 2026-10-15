@@ -2318,6 +2318,28 @@ body[data-not-sent] > #vis-container ~ #not-sent {
     <div style="font-size:13px;color:var(--text-secondary);margin-top:10px;line-height:1.5;border-top:0.5px solid var(--border);padding-top:10px;"><span style="color:var(--text-primary);font-weight:500;">Main gap: Security and scalability.</span> No controls for AI use exist; the next level requires at least basic access control.</div>
   </div>
 </div>
+<!-- API test: temporary, only to check that the page can reach the FastAPI app under /api -->
+<div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-top:1rem;">
+  <div style="font-size:15px;font-weight:500;color:var(--text-primary);">API test</div>
+  <button id="apiTestButton" type="button" style="margin-top:10px;font:inherit;font-size:13px;padding:6px 14px;border-radius:8px;border:0.5px solid var(--border);background:var(--text-primary);color:var(--surface-2);cursor:pointer;">Call /api/echo</button>
+  <pre id="apiTestResult" style="font-size:13px;color:var(--text-secondary);margin:10px 0 0;white-space:pre-wrap;"></pre>
+</div>
+<script>
+document.getElementById('apiTestButton').addEventListener('click', async function(){
+  var out = document.getElementById('apiTestResult');
+  out.textContent = 'Calling...';
+  try {
+    var response = await fetch('/api/echo', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: 'Hello from the report page'})
+    });
+    out.textContent = response.status + ' ' + JSON.stringify(await response.json());
+  } catch (error) {
+    out.textContent = 'Error: ' + error;
+  }
+});
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 (function(){

@@ -7,4 +7,3 @@ __pycache__/
 python_modules/
 .dev.vars
 .venv-workers/
-worker/public/
