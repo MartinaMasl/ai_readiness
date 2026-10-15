@@ -1,0 +1,8 @@
+.env
+logs/
+__pycache__/
+.venv/
+.DS_Store
+.wrangler/
+python_modules/
+.dev.vars
