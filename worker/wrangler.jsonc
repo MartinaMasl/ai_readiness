@@ -4,6 +4,10 @@
   "compatibility_date": "2026-10-15",
   "compatibility_flags": ["python_workers"],
 
+  // Bundle .json files in src/ (the rubric) so the Python code can read them.
+  // By default only .py files are included.
+  "rules": [{ "type": "Data", "globs": ["**/*.json"], "fallthrough": true }],
+
   // Files in public/ are served directly (so / shows index.html).
   // Requests that match no file, like /api, go to the FastAPI app.
   "assets": {

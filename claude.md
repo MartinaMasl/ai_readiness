@@ -15,7 +15,7 @@ This is an MVP: build what is listed here and nothing more.
 ## The methodology (fixed, do not change it)
 
 - Four dimensions (Data, People, Strategy, Technology), each with three
-  subdimensions. `rubric/rubric.json` currently holds only Data; the
+  subdimensions. `worker/src/rubric.json` currently holds only Data; the
   other three will be added later, and no code should need to change
   when they are.
 - Each subdimension is scored as a whole number from 0 to 5 by matching
@@ -25,14 +25,14 @@ This is an MVP: build what is listed here and nothing more.
 - Maturity level of a dimension or of the overall score = the score
   rounded down (floor). Carry full precision through the calculation and
   round to two decimals only for display.
-- A subdimension with no score (no evidence at all) is left out of its
-  dimension mean. If a dimension has no scored subdimension, it has no
-  score, and the overall score is reported as not available.
+- Every subdimension always gets a score. With no evidence at all it
+  scores 0 (see `insufficient_evidence` in `rules`), so every dimension
+  and the overall score always have a value.
 - The remaining rules (mixed evidence, plans, insufficient evidence,
   follow-up limit) are in `rules` in the rubric file. Read them from
   there; do not hard-code them.
 
-The texts in `rubric/rubric.json` and the rules in the prompts are part
+The texts in `worker/src/rubric.json` and the rules in the prompts are part
 of the thesis methodology. Do not reword them. If something in them
 blocks you or looks wrong, say so and ask.
 
@@ -55,17 +55,32 @@ never does arithmetic.
 8. Report (code): scores, levels and the report described below.
 9. Save: write the conversation log after every subdimension.
 
-In LangGraph this is four nodes (ask, check, score, report) with
-conditional edges for the follow-up loop and the next subdimension, and
-a pause for the respondent's answer.
+The app runs on Cloudflare Workers, which keep nothing in memory between
+requests. So the flow runs one step per request: each answer request
+loads the conversation state from the database (current subdimension,
+follow-ups asked so far, transcript, checks, scores), does one step and
+saves the state again. The "pause for the respondent's answer" is the
+end of a request.
+
+The flow is four steps (ask, check, score, report) with conditions for
+the follow-up loop and the next subdimension. Write it as short plain
+Python in `flow.py`, not with LangGraph: the current LangGraph does not
+install on Python Workers (see DECISIONS.md).
 
 ## The report
 
-`index.html` in the repository root shows how the report must look. It
-already exists and was made by the author. Treat it as the design
-reference: keep its layout and styling, and fill it with the calculated
-scores and rubric texts instead of the example values. Do not redesign
-it, and do not overwrite the original file; work from it as a template.
+`worker/public/result.html` shows how the report must look. It was made
+by the author (it is currently `worker/public/index.html` and will be
+renamed to `result.html` when the chat page takes over `/`). Treat it as
+the design reference: keep its layout and styling, and fill it with the
+calculated scores and rubric texts instead of the example values. Do not
+redesign it.
+
+The report is shown at `/result.html?id=<conversation id>`. The page
+loads the report data as JSON from `GET /api/conversations/{id}/report`
+and puts the values into the layout with a little JavaScript (for
+example the radar chart values). All calculation stays in Python
+(`scoring.py`, `report.py`); the page only displays.
 
 The report contains:
 
@@ -73,22 +88,44 @@ The report contains:
 - A radar chart of the dimension scores, each axis from 0 to 5.
 - Per dimension: score, level name, and the text from `report_levels`
   for that level.
-- Per dimension, the main gap: the lowest-scoring subdimension, its
-  current level description and the description of the next level. On a
+- Per dimension, the main gap: the lowest-scoring subdimension and its
+  one-sentence `gap` text for its current level (current state and what
+  the next level requires; `gap` in the rubric has levels 0 to 4). On a
   tie, take the subdimension listed first. If the lowest is at level 5,
   show no gap.
 - Subdimension scores are not shown as numbers to the respondent.
 
-If `index.html` shows something this list does not cover, or leaves out
+If `result.html` shows something this list does not cover, or leaves out
 something this list requires, do not decide yourself. Tell the author
 what differs and ask.
 
+## The chat page
+
+`worker/public/index.html` is the chat interface, shown at `/`. It is a
+plain HTML page in the same style as the report: a message list, a text
+box and a send button, with a little JavaScript that calls the API. When
+the last subdimension is scored, it sends the browser to
+`/result.html?id=<conversation id>`.
+
+## The API
+
+All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
+
+- `POST /api/conversations`: starts a conversation. Returns the
+  conversation id, the intro message and the first `opening_question`.
+- `POST /api/conversations/{id}/answer`: takes the respondent's answer,
+  runs the next step of the flow and returns the next chatbot message,
+  or `done: true` when everything is scored.
+- `GET /api/conversations/{id}/report`: returns the report data as JSON.
+
 ## The conversation log
 
-One JSON file per conversation in `logs/`, written after every
-subdimension so nothing is lost if a conversation stops. The author
-reads these files to find mistakes and improve the prompts, so they must
-contain everything needed to see why a score was given.
+One JSON log per conversation, stored in the Cloudflare D1 database
+(Workers cannot write files, so there is no `logs/` folder). It is
+written after every subdimension so nothing is lost if a conversation
+stops. The author reads these logs to find mistakes and improve the
+prompts, so they must contain everything needed to see why a score was
+given.
 
 Per conversation: an id, start time, model id and settings, rubric
 version, and the version of each prompt (read from the first line of the
@@ -126,41 +163,51 @@ Per subdimension:
 ```
 
 The `review` block stays empty; the author fills it in by hand later.
-The chatbot never reads log files back.
+The log is separate from the conversation state the flow uses; the
+chatbot never reads the log back.
 
 ## Stack
 
-- Python, LangGraph for the workflow.
-- LangChain's chat model integration, so the provider can be swapped.
-  Provider, model id and temperature come from environment variables.
-  Ask the author which provider she uses before the first model call.
-  Use temperature 0 and a fixed, dated model version.
+- Hosting on Cloudflare Workers (Python Workers). Static files in
+  `worker/public/` are served directly; every other request goes to the
+  FastAPI app. Run locally with `uv run pywrangler dev`, deploy with
+  `uv run pywrangler deploy`.
+- Python with FastAPI for the API. Only packages that run on Python
+  Workers can be used; verify a package there before relying on it.
+- Cloudflare D1 (SQL database) for the conversation state and the logs.
+- The flow: plain Python, no LangGraph (see "How the chatbot works").
+- LangChain's chat model integration, so the provider can be swapped, if
+  it runs on Python Workers. Provider, model id and temperature come from
+  environment variables. Ask the author which provider she uses before
+  the first model call. Use temperature 0 and a fixed, dated model
+  version.
 - Pydantic models for the rubric file, the check result, the score and
   the log. Use them for structured model output.
-- Streamlit for the chat. The report is `index.html` filled with data
-  and shown inside the Streamlit app. If the radar chart in `index.html`
-  is already drawn with a library, keep that library; otherwise use
-  Plotly.
+- Plain HTML and JavaScript for the chat page and the report page. The
+  radar chart in the report is drawn with Chart.js; keep it.
 - pytest for the scoring code.
-- API keys in `.env`, never in the repository. `.env` and `logs/` go in
-  `.gitignore`, because logs will contain respondents' answers.
+- API keys as Worker secrets (`wrangler secret put`), and locally in
+  `worker/.dev.vars`, never in the repository. `.dev.vars` goes in
+  `.gitignore`. Logs contain respondents' answers, so they stay in the
+  database and are never committed.
 
 ## Layout
 
 ```
-index.html              report design by the author, used as template
-rubric/rubric.json      input, same for every conversation
-prompts/check.md        input, versioned in its first line
-prompts/score.md        input, versioned in its first line
-app/rubric.py           loads and validates the rubric file
-app/scoring.py          means and levels
-app/report.py           report data, fills the index.html template
-app/graph.py            the workflow
-app/logging.py          writes the conversation log
-app/cli.py              terminal chat for testing
-app/ui.py               Streamlit app
-tests/
-logs/
+prompts/check.md             input, versioned in its first line
+prompts/score.md             input, versioned in its first line
+worker/wrangler.jsonc        Cloudflare settings
+worker/pyproject.toml        Python packages for the Worker
+worker/public/index.html     chat page, shown at /
+worker/public/result.html    report design by the author, filled with data
+worker/src/main.py           FastAPI app, the /api endpoints
+worker/src/rubric.json       the rubric (inside src/ so the Worker can read it)
+worker/src/rubric.py         loads and validates the rubric file
+worker/src/scoring.py        means and levels
+worker/src/report.py         report data as JSON
+worker/src/flow.py           the workflow, one step per request
+worker/src/storage.py        reads and writes state and logs in D1
+worker/tests/
 DECISIONS.md
 ```
 
@@ -174,16 +221,18 @@ test what you built, and wait for the author before starting the next.
 
 1. Rubric file. Done for the Data dimension.
 2. Rubric loader, scoring code and report data, with tests. No model.
-   This includes filling `index.html` with made-up scores so the author
-   can check the report.
-3. The two prompts tested alone: a small script that runs the check and
+   This includes the `GET /api/conversations/{id}/report` endpoint
+   returning made-up scores and `result.html` filled from it, so the
+   author can check the report.
+3. Chat page with a fake chatbot: it asks the opening questions in order
+   and gives fixed scores, with state and logs saved in D1. This shows
+   the whole flow on the live URL without a model.
+4. The two prompts tested alone: a small script that runs the check and
    the scoring prompt on hand-written answers and prints the result.
-4. The workflow as a terminal chat, with logs written to `logs/`.
-5. The Streamlit chat with the report shown at the end.
+5. The real model calls in the flow, replacing the fake chatbot.
 6. The other three dimensions in the rubric file (the author writes
    these).
-7. Deployment: hosting, a database for the logs, personal links, a
-   consent screen.
+7. Rest of deployment: personal links, a consent screen.
 8. Pilot conversations and prompt refinement.
 
 Tests for step 2 must include this worked example from the thesis:
@@ -195,14 +244,15 @@ Tests for step 2 must include this worked example from the thesis:
 | Strategy   | 2, 3, 3             | 2.67            | 2     |
 | Technology | 1, 1, 0             | 0.67            | 0     |
 
-Overall score 2.58, level 2. Also test a dimension with one unscored
-subdimension (4, none, 5 gives 4.5) and the main-gap tie rule.
+Overall score 2.58, level 2. Also test a subdimension with no evidence
+(4, 0, 5 gives 3.0) and the main-gap tie rule.
 
 ## Not in scope until the author asks
 
-A database, login, deployment, resuming a conversation, a summary the
-respondent confirms, the questionnaire, fine-tuning, and any extra model
-call beyond check and score.
+Login, resuming a conversation, a summary the respondent confirms, the
+questionnaire, fine-tuning, and any extra model call beyond check and
+score. (Hosting and the D1 database are in scope, because the app runs
+on Cloudflare Workers.)
 
 ## Decision log
 

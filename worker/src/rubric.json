@@ -5,7 +5,7 @@
     "max_follow_ups": 2,
     "mixed_evidence": "Choose the level that fits best overall. If the evidence sits between two levels, choose the lower one.",
     "plans": "Score the current state. Plans and intentions do not count.",
-    "insufficient_evidence": "If there is evidence for at least one criterion, score on that evidence and set the flag 'insufficient_evidence'. If there is no evidence at all, return no score; the subdimension is left out of the dimension mean."
+    "insufficient_evidence": "If there is evidence for at least one criterion, score on that evidence and set the flag 'insufficient_evidence'. If there is no evidence at all, the score is 0 and the flag 'insufficient_evidence' is set."
   },
   "scale": {
     "0": {
@@ -80,6 +80,13 @@
             "4": "The organization-wide system for finding data is actively monitored and measured, for example through its coverage, how current its entries are, and how long employees need to find data. Gaps and outdated entries are identified and corrected, and responsibility for maintaining the system is assigned.",
             "5": "The organization-wide system for finding data is continuously improved based on usage data and employee feedback, supported by advanced tooling such as automated metadata capture and search. Problems in finding data are used systematically to refine the system."
           },
+          "gap": {
+            "0": "There is no way to find data; the next level requires that employees can at least find data through their own searching or asking.",
+            "1": "Finding data depends on individual effort; the next level requires established channels, such as known contacts or team lists.",
+            "2": "Data is found through informal channels within teams; the next level requires a documented, organization-wide mechanism such as a data catalog.",
+            "3": "A documented, organization-wide way to find data exists; the next level requires monitoring its coverage and currency, with assigned maintenance.",
+            "4": "The system for finding data is monitored; the next level requires improving it continuously based on usage data and feedback."
+          },
           "examples": []
         },
         {
@@ -116,6 +123,13 @@
             "4": "Ownership is actively monitored and measured, for example through the share of datasets with an assigned owner and regular reviews of ownership records. Gaps, such as datasets without an owner or owners who have left, are identified and corrected.",
             "5": "Ownership practices are continuously improved based on monitoring results and feedback from owners and data users. Ownership is built into tools and processes, so that, for example, every new dataset is assigned an owner when it is created."
           },
+          "gap": {
+            "0": "Data ownership is not recognized; the next level requires that individuals at least take responsibility for datasets when problems occur.",
+            "1": "No one clearly owns the data; the next level requires owners who are known within teams.",
+            "2": "Ownership is informal; the next level requires assigned, documented owners.",
+            "3": "Ownership is formally assigned; the next level requires monitoring it, for example for datasets without an owner.",
+            "4": "Ownership is monitored; the next level requires improving it continuously and assigning owners when datasets are created."
+          },
           "examples": []
         },
         {
@@ -151,6 +165,13 @@
             "3": "Organization-wide quality rules covering accuracy, consistency, validity, uniqueness, and integrity are documented and applied consistently, with assigned responsibilities. Data can be used with limited preparation.",
             "4": "Data quality is measured against defined thresholds for accuracy, consistency, validity, uniqueness, and integrity, and the results are monitored. Rules are enforced through system controls (e.g., required fields, validation checks), and deviations are identified and corrected.",
             "5": "Data quality is continuously improved: measurement results are used to refine quality rules and controls, and recurring problems are fixed at their source. Monitoring is largely automated, and data can be used for analytics and AI without additional preparation."
+          },
+          "gap": {
+            "0": "Data quality is not managed; the next level requires that quality problems are at least fixed when someone notices them.",
+            "1": "Quality problems are fixed case by case; the next level requires basic checks that teams repeat.",
+            "2": "Quality checks are informal and differ between teams; the next level requires documented, organization-wide quality rules.",
+            "3": "Quality rules are documented; the next level requires measuring quality against thresholds and enforcing rules through system controls.",
+            "4": "Data quality is measured and controlled; the next level requires using the results to improve the rules and fix recurring problems at their source."
           },
           "examples": []
         }
