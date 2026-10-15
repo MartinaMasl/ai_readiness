@@ -1,16 +1,33 @@
 {
-  "name": "ai-readiness",
-  "main": "src/main.py",
-  "compatibility_date": "2026-10-15",
-  "compatibility_flags": ["python_workers"],
-
-  // Bundle .json files in src/ (the rubric) so the Python code can read them.
-  // By default only .py files are included.
-  "rules": [{ "type": "Data", "globs": ["**/*.json"], "fallthrough": true }],
-
-  // Files in public/ are served directly (so / shows index.html).
-  // Requests that match no file, like /api, go to the FastAPI app.
-  "assets": {
-    "directory": "./public"
-  }
+	"name": "ai-readiness",
+	"main": "src/main.py",
+	"compatibility_date": "2026-10-15",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	// Bundle .json files in src/ (the rubric) so the Python code can read them.
+	// By default only .py files are included.
+	"rules": [
+		{
+			"type": "Data",
+			"globs": [
+				"**/*.json"
+			],
+			"fallthrough": true
+		}
+	],
+	// D1 database for the conversation state and the logs (see storage.py).
+	// Tables are created by the SQL files in migrations/.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ai-readiness",
+			"database_id": "c33713ab-8d12-44c9-976d-931facdbce8c"
+		}
+	],
+	// Files in public/ are served directly (so / shows index.html).
+	// Requests that match no file, like /api, go to the FastAPI app.
+	"assets": {
+		"directory": "./public"
+	}
 }
