@@ -2,5 +2,17 @@
   "name": "ai-readiness",
   "main": "src/main.py",
   "compatibility_date": "2026-10-15",
-  "compatibility_flags": ["python_workers"]
+  "compatibility_flags": ["python_workers"],
+
+  // Before every dev/deploy, copy the report design from the repo root.
+  // The original index.html stays where it is.
+  "build": {
+    "command": "mkdir -p public && cp ../index.html public/index.html"
+  },
+
+  // Files in public/ are served directly (so / shows index.html).
+  // Requests that match no file, like /api, go to the FastAPI app.
+  "assets": {
+    "directory": "./public"
+  }
 }
