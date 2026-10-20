@@ -44,11 +44,37 @@ never does arithmetic.
 1. Start: fixed intro message.
 2. Ask: the fixed `opening_question` of the current subdimension.
 3. Answer: wait for the respondent.
-4. Check (model call, `prompts/check.md`): for each criterion, is there
-   evidence, with the quote; if something is missing, one follow-up
-   question.
-5. Loop: if not everything is covered and fewer than `max_follow_ups`
-   follow-ups were asked, ask the follow-up and go back to 3.
+4. Check (model call, `prompts/check.md`): is the message an answer or
+   a clarification request ("what do you mean by ...?"); for each
+   criterion, is there evidence, with the quote; if something is
+   missing, one follow-up question. For a clarification request, the
+   follow-up explains and asks the question again.
+5. Loop: if not everything is covered or the respondent asked for
+   clarification, and fewer than `max_follow_ups` follow-ups were asked,
+   ask the follow-up and go back to 3. Clarifications and follow-ups
+   share this one limit, so a subdimension has at most `max_follow_ups`
+   chatbot messages after the opening question.
+
+Rules for the follow-up text in `prompts/check.md` (decided by the
+author, discussed in the thesis as part of the chatbot format):
+
+- The follow-up may refer to what the respondent said, but asks about
+  exactly one missing criterion, does not suggest an answer and does not
+  assume facts the respondent did not state.
+- A clarification replies to what the respondent actually asked, in
+  the model's own words, and then asks the question again. Three cases:
+  - About the meaning of the question or a term ("What do you mean by
+    'find data'?"): answer that specific doubt using only the
+    subdimension `definition`, without copying it word for word.
+  - About the conversation itself ("How long will this take?", "Who
+    sees my answers?"): say briefly that it does not know; invent
+    nothing.
+  - Unrelated ("Can you recommend a data catalog tool?"): say politely
+    that it cannot help with that here.
+- In every case a clarification never gives examples of good practice,
+  never mentions levels and never suggests an answer.
+- The opening questions stay fixed; only follow-ups are written by the
+  model.
 6. Score (model call, `prompts/score.md`): level, evidence quotes,
    reason, why not higher, flags.
 7. Next subdimension, back to 2, until all are done.
@@ -146,6 +172,7 @@ Per subdimension:
         "assignment": {"covered": true, "quote": "..."},
         "documentation": {"covered": false, "quote": null}
       },
+      "message_type": "answer",
       "all_covered": false,
       "follow_up": "...",
       "targets": "documentation"
@@ -162,9 +189,33 @@ Per subdimension:
 }
 ```
 
-The `review` block stays empty; the author fills it in by hand later.
+`message_type` is `answer` or `clarification_request`; for a
+clarification request `targets` may be null. The `review` block stays empty; the author fills it in by hand later.
 The log is separate from the conversation state the flow uses; the
 chatbot never reads the log back.
+
+## The database tables
+
+D1 has two tables, one row per conversation in each, both holding JSON
+(created by `worker/migrations/`, read and written only in `storage.py`).
+
+- `conversations`: the chatbot's working memory, so the flow can
+  continue. Workers forget everything between requests, so every answer
+  request loads this state, does one step and saves it again. It holds
+  only what the next step needs: current subdimension, follow-ups asked,
+  transcript, checks of the current subdimension, the levels scored so
+  far, and whether the conversation is done. The report is calculated
+  from the levels here.
+- `logs`: the author's research record, so she can see why each score
+  was given and improve the prompts. The chatbot writes it after every
+  subdimension and never reads it. It keeps everything the state drops:
+  all checks with quotes, the full score (evidence, reason, why not
+  higher, flags), the empty `review` block, and the model, rubric and
+  prompt versions.
+
+Keep them separate: the flow must never depend on the log, so earlier
+reasons and evidence cannot influence later scores, and the author's
+review cannot affect a running conversation.
 
 ## Stack
 
@@ -176,11 +227,13 @@ chatbot never reads the log back.
   Workers can be used; verify a package there before relying on it.
 - Cloudflare D1 (SQL database) for the conversation state and the logs.
 - The flow: plain Python, no LangGraph (see "How the chatbot works").
-- LangChain's chat model integration, so the provider can be swapped, if
-  it runs on Python Workers. Provider, model id and temperature come from
-  environment variables. Ask the author which provider she uses before
-  the first model call. Use temperature 0 and a fixed, dated model
-  version.
+- Model calls: OpenAI's own Python package (`openai`), no LangChain
+  (see DECISIONS.md). The Pydantic models are passed to it for
+  structured output, and the reply is validated with them. The Worker
+  bundle limit is 64 MiB uncompressed on every plan; check new packages
+  against it with `uv run pywrangler deploy --dry-run`. Provider: OpenAI, model
+  GPT-6.1 Sol. Model id and temperature come from environment
+  variables. Use temperature 0 and a fixed, dated model version.
 - Pydantic models for the rubric file, the check result, the score and
   the log. Use them for structured model output.
 - Plain HTML and JavaScript for the chat page and the report page. The
@@ -206,8 +259,10 @@ worker/src/rubric.py         loads and validates the rubric file
 worker/src/scoring.py        means and levels
 worker/src/report.py         report data as JSON
 worker/src/flow.py           the workflow, one step per request
+worker/src/llm.py            prompts, request body and reply checks for the two model calls
 worker/src/storage.py        reads and writes state and logs in D1
 worker/tests/
+worker/scripts/try_prompts.py  step 4: runs both prompts on hand-written answers
 DECISIONS.md
 ```
 

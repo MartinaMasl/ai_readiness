@@ -2,7 +2,9 @@
 
 Code controls the flow: ask the opening question, check the answer, ask
 a follow-up while something is missing (at most max_follow_ups), score,
-move to the next subdimension, and finish.
+move to the next subdimension, and finish. If the respondent asks for
+clarification instead of answering, the follow-up explains and asks again;
+it counts towards the same limit.
 
 Step 3: the check and the score are FAKE (fake_check, fake_score). Step 5
 replaces only these two functions with the model calls; the rest of the
@@ -10,7 +12,8 @@ flow stays the same.
 
 The state is a plain dict so it can be saved to D1 as JSON:
     subdimension_index  position in the list of all subdimensions
-    follow_ups          follow-ups asked in the current subdimension
+    follow_ups          follow-ups (including re-asked questions after a
+                        clarification request) in the current subdimension
     transcript          all messages, each tagged with its subdimension
     checks              check results of the current subdimension
     scores              {dimension: {subdimension: level}}
@@ -50,9 +53,12 @@ def check_summary(rubric: Rubric, state: dict) -> dict | None:
     no follow-up is open.
 
     After a subdimension is scored, state["checks"] is empty again, so a
-    non-empty list means the last message was a follow-up.
+    non-empty list means the last message was a follow-up. A re-asked
+    question after a clarification request gets no check box.
     """
     if state["done"] or not state["checks"]:
+        return None
+    if state["checks"][-1]["message_type"] == "clarification_request":
         return None
     _, sub = all_subdimensions(rubric)[state["subdimension_index"]]
     check = state["checks"][-1]
@@ -92,12 +98,24 @@ def new_conversation(rubric: Rubric, conversation_id: str, started_at: str) -> t
 
 # --- FAKE: replaced by model calls in step 5 --------------------------------
 
-def fake_check(sub: Subdimension, follow_ups: int) -> dict:
-    """First answer: nothing covered, ask about the first criterion. After one
-    follow-up: everything covered. Shows the follow-up loop without a model."""
+def fake_check(sub: Subdimension, follow_ups: int, answer: str) -> dict:
+    """A message ending in "?" is a clarification request: a placeholder
+    reply (the real model answers the actual question), then the opening
+    question again. Otherwise the first answer
+    covers nothing (follow-up about the first criterion) and after one
+    follow-up everything is covered. Shows the follow-up loop without a model."""
+    if answer.endswith("?"):
+        return {
+            "message_type": "clarification_request",
+            "criteria": {c.id: {"covered": False, "quote": None} for c in sub.criteria},
+            "all_covered": False,
+            "follow_up": f"[fake] The model would answer your question here. {sub.opening_question}",
+            "targets": None,
+        }
     covered = follow_ups >= 1
     target: Criterion = sub.criteria[0]
     return {
+        "message_type": "answer",
         "criteria": {c.id: {"covered": covered, "quote": None} for c in sub.criteria},
         "all_covered": covered,
         "follow_up": None if covered else f"Thank you. Could you tell me a bit more? {target.description}",
@@ -126,10 +144,13 @@ def handle_answer(rubric: Rubric, state: dict, log: dict, answer: str) -> tuple[
     dimension_name, sub = subdimensions[state["subdimension_index"]]
     state["transcript"].append({"subdimension": sub.name, "role": "respondent", "text": answer})
 
-    # Check: is every criterion covered? If not, ask a follow-up (limited).
-    check = fake_check(sub, state["follow_ups"])
+    # Check: is every criterion covered? If not, or if the respondent asked
+    # for clarification, ask a follow-up. Clarifications and follow-ups
+    # share one limit (max_follow_ups).
+    check = fake_check(sub, state["follow_ups"], answer)
     state["checks"].append(check)
-    if not check["all_covered"] and state["follow_ups"] < rubric.rules.max_follow_ups:
+    needs_follow_up = check["message_type"] == "clarification_request" or not check["all_covered"]
+    if needs_follow_up and state["follow_ups"] < rubric.rules.max_follow_ups:
         state["follow_ups"] += 1
         state["transcript"].append({"subdimension": sub.name, "role": "chatbot", "text": check["follow_up"]})
         return check["follow_up"], False, False

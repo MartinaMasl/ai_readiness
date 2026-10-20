@@ -45,8 +45,24 @@ def test_whole_conversation_scores_every_subdimension():
 def test_follow_ups_never_exceed_the_rubric_limit():
     state, log, _ = run_whole_conversation()
     for entry in log["subdimensions"]:
-        follow_ups = sum(1 for check in entry["checks"] if not check["all_covered"])
+        chatbot_messages = [m for m in entry["transcript"] if m["role"] == "chatbot"]
+        follow_ups = len(chatbot_messages) - 1  # minus the opening question
         assert follow_ups <= RUBRIC.rules.max_follow_ups
+
+
+def test_clarification_request_is_answered_and_counts_towards_the_limit():
+    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+    first, second = SUBS[0][1], SUBS[1][1]
+
+    message, done, _ = flow.handle_answer(RUBRIC, state, log, "What do you mean?")
+    assert message.startswith("[fake]") and first.opening_question in message
+    assert flow.check_summary(RUBRIC, state) is None  # no check box for a clarification
+
+    flow.handle_answer(RUBRIC, state, log, "Sorry, what?")  # second and last follow-up
+    message, _, log_changed = flow.handle_answer(RUBRIC, state, log, "Still unclear?")
+    assert message == second.opening_question  # limit reached: scored and moved on
+    assert log_changed
+    assert [c["message_type"] for c in log["subdimensions"][0]["checks"]] == ["clarification_request"] * 3
 
 
 def test_log_has_one_entry_per_subdimension_in_the_agreed_shape():
