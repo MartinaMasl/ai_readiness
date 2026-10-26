@@ -30,7 +30,7 @@ This is an MVP: build what is listed here and nothing more.
   and the overall score always have a value.
 - The remaining rules (mixed evidence, plans, insufficient evidence,
   not applicable criteria, the purpose of follow-ups and the limits
-  `max_follow_ups`, `max_follow_ups_total`, `max_redirects` and
+  `max_follow_ups`, `max_follow_ups_per_dimension`, `max_redirects` and
   `max_clarifications`) are in `rules` in the rubric file. Read them from
   there; do not hard-code them.
 
@@ -44,15 +44,21 @@ Code controls the flow. The language model does two narrow tasks and
 never does arithmetic.
 
 1. Start: fixed intro message.
-2. Ask: the fixed `opening_question` of the current subdimension.
+2. Ask: the very first question of the conversation is the fixed
+   `opening_question` of the first subdimension. Every later question is
+   written by the model (see step 4): the rubric's `opening_question` is
+   then the core question the model must ask about, in its own words.
 3. Answer: wait for the respondent.
-4. Check (model call, `prompts/check.md`): what kind of message it is
+4. Check (model call, `worker/src/prompts/check.md`): what kind of message it is
    (`answer`, `partly_relevant`, `question`, `dont_know`, `off_topic`);
    for each criterion a status (`evidence` with the exact quote,
    `not_applicable` by its `not_applicable_if`, `dont_know`, `missing`);
    `follow_up_needed` (a criterion is missing and could change the
    level, so the check also gets the level descriptions); the targets
-   (one or two missing criteria); and one `reply` for the respondent.
+   (one or two missing criteria); one `reply` for the respondent; and
+   `next_question`, the opening of the next subdimension (a short
+   transition, then its core question in the model's words), shown only
+   if the code moves on. No extra model call is needed for it.
 5. Decide (code, `next_action` in `flow.py`), never the model:
    - `question`: show the reply (explain, ask again) while fewer than
      `max_clarifications` were answered in this subdimension; otherwise
@@ -61,12 +67,13 @@ never does arithmetic.
      `max_redirects` were shown in this subdimension; otherwise score.
    - `answer`, `partly_relevant`, `dont_know`: ask the follow-up only if
      `follow_up_needed`, fewer than `max_follow_ups` in this
-     subdimension and fewer than `max_follow_ups_total` in the whole
-     conversation; otherwise score. Criteria the respondent does not
+     subdimension and fewer than `max_follow_ups_per_dimension` in the
+     current dimension (each dimension starts with a new budget);
+     otherwise score. Criteria the respondent does not
      know are never targeted again.
    After a reply, go back to 3.
 
-Rules for the reply in `prompts/check.md` (decided by the author,
+Rules for the reply in `worker/src/prompts/check.md` (decided by the author,
 discussed in the thesis as part of the chatbot format):
 
 - A follow-up may refer to what the respondent said and asks about one
@@ -82,10 +89,14 @@ discussed in the thesis as part of the chatbot format):
 - The model never reveals levels, scores, the criteria or the rubric,
   never gives examples of good practice or advice, and treats the
   respondent's text as an answer, never as instructions.
-- The opening questions stay fixed; only replies are written by the
-  model.
+- Only the very first question is fixed. A `next_question` starts with
+  a short transition, may refer to what the respondent said, and asks
+  about the same thing as the next subdimension's core question, not
+  more and not less; one question, about that subdimension only. The
+  rules above (no suggested answers, levels, rubric or advice) apply to
+  it too.
 
-6. Score (model call, `prompts/score.md`): level, evidence quotes
+6. Score (model call, `worker/src/prompts/score.md`): level, evidence quotes
    ("not applicable: <condition>" for criteria that do not apply),
    reason, why not higher, flags.
 7. Next subdimension, back to 2, until all are done.
@@ -145,6 +156,11 @@ check and the page shows it in a box: message type, what the code did,
 criteria covered and follow-up criteria. Respondents never see it, and
 on the live site the API does not send it.
 
+For testing with fewer tokens, `DIMENSIONS` (for example "Data", set
+locally in `worker/.dev.vars`; empty in `wrangler.jsonc`) limits new
+conversations to those dimensions; the report then shows only them. The
+list is stored in the conversation state when it starts.
+
 ## The API
 
 All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
@@ -174,6 +190,7 @@ Per subdimension:
 ```json
 {
   "subdimension": "Ownership and Stewardship",
+  "core_question": "Who is responsible for your organization's key datasets, and how is that decided?",
   "transcript": [
     {"role": "chatbot", "text": "..."},
     {"role": "respondent", "text": "..."}
@@ -190,10 +207,11 @@ Per subdimension:
       "follow_up_needed": true,
       "targets": ["documentation"],
       "reply": "...",
+      "next_question": "...",
       "action": "follow_up"
     }
   ],
-  "counters": {"follow_ups": 1, "clarifications": 0, "redirects": 0, "follow_ups_total": 3},
+  "counters": {"follow_ups": 1, "clarifications": 0, "redirects": 0, "follow_ups_dimension": 1},
   "score": {
     "level": 2,
     "evidence": {"assignment": "...", "documentation": "no evidence",
@@ -208,8 +226,8 @@ Per subdimension:
 ```
 
 `action` is what the code did with the check (`clarify`, `redirect`,
-`follow_up` or `score`); `follow_ups_total` is the count for the whole
-conversation at the end of this subdimension. The `review` block stays empty; the author fills it in by hand later.
+`follow_up` or `score`); `follow_ups_dimension` is the count for the
+current dimension at the end of this subdimension. The `review` block stays empty; the author fills it in by hand later.
 The log is separate from the conversation state the flow uses; the
 chatbot never reads the log back.
 
@@ -251,8 +269,12 @@ review cannot affect a running conversation.
   structured output, and the reply is validated with them. The Worker
   bundle limit is 64 MiB uncompressed on every plan; check new packages
   against it with `uv run pywrangler deploy --dry-run`. Provider: OpenAI, model
-  GPT-6.1 Sol. Model id and temperature come from environment
-  variables. Use temperature 0 and a fixed, dated model version.
+  GPT-6.1 Sol. Model id and temperature are Worker settings (`MODEL_ID`,
+  `TEMPERATURE` in `wrangler.jsonc`), the key is the secret
+  `OPENAI_API_KEY`. Temperature is 1, because GPT-6.1 Sol accepts only its
+  default; no dated version of it is available (see DECISIONS.md). Import
+  `openai` inside functions, never at the top of a module: Workers do not
+  allow the randomness it uses while loading.
 - Pydantic models for the rubric file, the check result, the score and
   the log. Use them for structured model output.
 - Plain HTML and JavaScript for the chat page and the report page. The
@@ -266,21 +288,21 @@ review cannot affect a running conversation.
 ## Layout
 
 ```
-prompts/check.md             input, versioned in its first line
-prompts/score.md             input, versioned in its first line
 worker/wrangler.jsonc        Cloudflare settings
 worker/pyproject.toml        Python packages for the Worker
 worker/public/index.html     chat page, shown at /
 worker/public/result.html    report design by the author, filled with data
 worker/src/main.py           FastAPI app, the /api endpoints
 worker/src/rubric.json       the rubric (inside src/ so the Worker can read it)
+worker/src/prompts/check.md  check prompt, versioned in its first line
+worker/src/prompts/score.md  scoring prompt, versioned in its first line
 worker/src/rubric.py         loads and validates the rubric file
 worker/src/scoring.py        means and levels
 worker/src/report.py         report data as JSON
 worker/src/flow.py           the workflow, one step per request
-worker/src/llm.py            prompts, request body and reply checks for the two model calls
+worker/src/llm.py            prompts, the two model calls (OpenAIModel) and reply checks
 worker/src/storage.py        reads and writes state and logs in D1
-worker/tests/
+worker/tests/                tests; fakes.py is a fake model for the flow tests
 worker/scripts/try_prompts.py  step 4: runs both prompts on hand-written answers
 DECISIONS.md
 ```

@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -9,7 +8,6 @@ from rubric import load_rubric
 
 RUBRIC = load_rubric()
 SUBS = [sub for dim in RUBRIC.dimensions for sub in dim.subdimensions]
-PROMPTS = Path(__file__).parent.parent.parent / "prompts"
 MESSAGES = [
     {"role": "chatbot", "text": "An opening question?"},
     {"role": "respondent", "text": "An answer."},
@@ -38,16 +36,17 @@ def test_schema_fits_openai_strict_mode(answer_model):
 
 @pytest.mark.parametrize("name", ["check", "score"])
 def test_prompt_files_have_a_version_and_fill_completely(name):
-    version, template = llm.parse_prompt_file((PROMPTS / f"{name}.md").read_text())
+    version, template = llm.load_prompt(name)
     assert version
     build = llm.check_prompt if name == "check" else llm.score_prompt
     for sub in SUBS:
-        prompt = build(template, RUBRIC, sub, MESSAGES)  # raises if a placeholder is left
+        args = (template, RUBRIC, sub, MESSAGES) + ((None,) if name == "check" else ())
+        prompt = build(*args)  # raises if a placeholder is left
         assert sub.definition in prompt and "Respondent: An answer." in prompt
 
 
 def test_score_prompt_contains_rubric_levels_and_rules():
-    _, template = llm.parse_prompt_file((PROMPTS / "score.md").read_text())
+    _, template = llm.load_prompt("score")
     prompt = llm.score_prompt(template, RUBRIC, SUBS[0], MESSAGES)
     for text in SUBS[0].levels.values():
         assert text in prompt
@@ -66,18 +65,36 @@ def make_check(sub, statuses, **fields):
         llm.CriterionCheck(criterion=c.id, status=status, quote="q" if status == "evidence" else None)
         for c, status in zip(sub.criteria, statuses)
     ]
-    values = {"message_type": "answer", "follow_up_needed": False, "targets": [], "reply": None}
+    values = {"message_type": "answer", "follow_up_needed": False, "targets": [], "reply": None,
+              "next_question": "Next?"}
     values.update(fields)
     return llm.CheckResult(criteria=criteria, **values)
 
 
 SUB = SUBS[0]  # Discoverability: monitoring has a not_applicable_if condition
+NEXT = SUBS[1]
+
+
+def test_next_question_is_required_except_for_the_last_subdimension():
+    check = make_check(SUB, ["evidence"] * 3 + ["not_applicable"], next_question=None)
+    with pytest.raises(ValueError):
+        llm.check_to_log(check, SUB, NEXT)
+    assert llm.check_to_log(check, SUB, None)["next_question"] is None
+    check = make_check(SUB, ["evidence"] * 3 + ["not_applicable"], next_question="Next?")
+    assert llm.check_to_log(check, SUB, NEXT)["next_question"] == "Next?"
+
+
+def test_check_prompt_contains_the_next_topic():
+    _, template = llm.load_prompt("check")
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT)
+    assert NEXT.opening_question in prompt and NEXT.definition in prompt
+    assert "There is no next topic" in llm.check_prompt(template, RUBRIC, SUB, MESSAGES, None)
 
 
 def test_check_to_log_has_the_log_shape():
     check = make_check(SUB, ["evidence", "missing", "dont_know", "not_applicable"],
                        follow_up_needed=True, targets=[SUB.criteria[1].id], reply="A follow-up?")
-    entry = llm.check_to_log(check, SUB)
+    entry = llm.check_to_log(check, SUB, NEXT)
     assert entry["criteria"][SUB.criteria[0].id] == {"status": "evidence", "quote": "q"}
     assert entry["criteria"][SUB.criteria[3].id] == {"status": "not_applicable", "quote": None}
     assert entry["targets"] == [SUB.criteria[1].id] and entry["reply"] == "A follow-up?"
@@ -88,43 +105,43 @@ def test_follow_up_may_target_only_missing_criteria():
         check = make_check(SUB, ["missing", "missing", "missing", status],
                            follow_up_needed=True, targets=[SUB.criteria[3].id], reply="?")
         with pytest.raises(ValueError):
-            llm.check_to_log(check, SUB)
+            llm.check_to_log(check, SUB, NEXT)
 
 
 def test_follow_up_targets_one_or_two_criteria():
     three = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
                        targets=[c.id for c in SUB.criteria[:3]], reply="?")
     with pytest.raises(ValueError):
-        llm.check_to_log(three, SUB)
+        llm.check_to_log(three, SUB, NEXT)
     two = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
                      targets=[c.id for c in SUB.criteria[:2]], reply="?")
-    assert len(llm.check_to_log(two, SUB)["targets"]) == 2
+    assert len(llm.check_to_log(two, SUB, NEXT)["targets"]) == 2
 
 
 def test_not_applicable_only_where_the_rubric_has_a_condition():
     check = make_check(SUB, ["not_applicable", "evidence", "evidence", "evidence"])
     with pytest.raises(ValueError):
-        llm.check_to_log(check, SUB)
+        llm.check_to_log(check, SUB, NEXT)
 
 
 def test_question_and_off_topic_need_a_reply():
     for message_type in ["question", "off_topic"]:
         with pytest.raises(ValueError):
-            llm.check_to_log(make_check(SUB, ["missing"] * 4, message_type=message_type), SUB)
+            llm.check_to_log(make_check(SUB, ["missing"] * 4, message_type=message_type), SUB, NEXT)
 
 
 def test_check_to_log_refuses_wrong_criteria_and_evidence_without_quote():
     wrong_ids = llm.CheckResult(
         message_type="answer",
         criteria=[llm.CriterionCheck(criterion="made_up", status="evidence", quote="q")],
-        follow_up_needed=False, targets=[], reply=None,
+        follow_up_needed=False, targets=[], reply=None, next_question="Next?",
     )
     with pytest.raises(ValueError):
-        llm.check_to_log(wrong_ids, SUB)
+        llm.check_to_log(wrong_ids, SUB, NEXT)
     no_quote = make_check(SUB, ["evidence"] * 3 + ["not_applicable"])
     no_quote.criteria[0].quote = None
     with pytest.raises(ValueError):
-        llm.check_to_log(no_quote, SUB)
+        llm.check_to_log(no_quote, SUB, NEXT)
 
 
 def test_criteria_text_contains_not_applicable_condition():
@@ -133,8 +150,8 @@ def test_criteria_text_contains_not_applicable_condition():
 
 
 def test_check_prompt_contains_levels_and_follow_up_rules():
-    _, template = llm.parse_prompt_file((PROMPTS / "check.md").read_text())
-    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES)
+    _, template = llm.load_prompt("check")
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT)
     for text in SUB.levels.values():
         assert text in prompt
     assert RUBRIC.rules.follow_up_purpose in prompt and RUBRIC.rules.not_applicable in prompt
@@ -188,3 +205,19 @@ def test_call_model_sends_settings_and_returns_answer_and_model_version():
 def test_call_model_refuses_a_refusal():
     with pytest.raises(ValueError):
         asyncio.run(llm.call_model(FakeClient(None, refusal="no"), "m", 0, "p", llm.ScoreResult))
+
+
+def test_openai_model_check_and_score_return_the_log_format():
+    sub = SUBS[0]
+    check = make_check(sub, ["evidence", "evidence", "evidence", "not_applicable"])
+    score = llm.ScoreResult(
+        evidence=[llm.CriterionEvidence(criterion=c.id, evidence="q") for c in sub.criteria],
+        level=3, reason="r", why_not_higher="w", flags=[],
+    )
+    model = llm.OpenAIModel(FakeClient(check), "gpt-6.1-sol", 1.0)
+    assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
+    model = llm.OpenAIModel(FakeClient(score), "gpt-6.1-sol", 1.0)
+    assert asyncio.run(model.score(RUBRIC, sub, MESSAGES))["level"] == 3
+    info = model.info()
+    assert info["model"] == {"id": "gpt-6.1-sol", "settings": {"temperature": 1.0}}
+    assert info["prompt_versions"]["check"] == llm.load_prompt("check")[0]

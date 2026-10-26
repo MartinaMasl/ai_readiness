@@ -21,7 +21,7 @@ def scores(data):
 def test_rubric_loads():
     assert DATA.name == "Data"
     assert len(DATA.subdimensions) == 3
-    assert RUBRIC.rules.max_follow_ups >= 0 and RUBRIC.rules.max_follow_ups_total >= 0
+    assert RUBRIC.rules.max_follow_ups >= 0 and RUBRIC.rules.max_follow_ups_per_dimension >= 0
 
 
 def test_every_dimension_has_three_subdimensions():
@@ -58,3 +58,11 @@ def test_four_dimension_demo_matches_worked_example():
     assert [d["score_display"] for d in report["dimensions"]] == ["3.67", "3.33", "2.67", "0.67"]
     assert report["overall"]["score_display"] == "2.58"
     assert report["overall"]["level"]["number"] == 2
+
+
+def test_only_dimensions_keeps_rubric_order_and_refuses_unknown_names():
+    from rubric import only_dimensions
+    names = [d.name for d in RUBRIC.dimensions]
+    assert [d.name for d in only_dimensions(RUBRIC, list(reversed(names))).dimensions] == names
+    with pytest.raises(ValueError):
+        only_dimensions(RUBRIC, ["Nonsense"])

@@ -24,7 +24,6 @@ sys.path.insert(0, str(WORKER / "src"))
 import llm  # noqa: E402
 from rubric import load_rubric  # noqa: E402
 
-PROMPTS = WORKER.parent / "prompts"
 
 # Hand-written conversations. Each one is the transcript of one
 # subdimension so far; the last message is the respondent's.
@@ -118,9 +117,10 @@ async def main() -> None:
     settings = read_settings()
     client = AsyncOpenAI(api_key=settings["OPENAI_API_KEY"])
     rubric = load_rubric()
-    subs = {sub.name: sub for dim in rubric.dimensions for sub in dim.subdimensions}
-    check_version, check_template = llm.parse_prompt_file((PROMPTS / "check.md").read_text())
-    score_version, score_template = llm.parse_prompt_file((PROMPTS / "score.md").read_text())
+    in_order = [sub for dim in rubric.dimensions for sub in dim.subdimensions]
+    subs = {sub.name: sub for sub in in_order}
+    check_version, check_template = llm.load_prompt("check")
+    score_version, score_template = llm.load_prompt("score")
     print(f"Model {settings['MODEL_ID']}, temperature {settings['TEMPERATURE']}, "
           f"rubric {rubric.version}, check.md {check_version}, score.md {score_version}")
 
@@ -134,7 +134,10 @@ async def main() -> None:
         print(f"\n=== Case {number}: {case['title']} ({sub.name})")
         print(llm.format_transcript(messages))
         print("\n--- check")
-        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages), llm.CheckResult, sub, llm.check_to_log)
+        position = in_order.index(sub)
+        next_sub = in_order[position + 1] if position + 1 < len(in_order) else None
+        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, next_sub),
+                  llm.CheckResult, sub, lambda result, sub: llm.check_to_log(result, sub, next_sub))
         print("\n--- score")
         await run(client, settings, llm.score_prompt(score_template, rubric, sub, messages), llm.ScoreResult, sub, llm.score_to_log)
 

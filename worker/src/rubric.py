@@ -24,7 +24,7 @@ def _check_all_levels(value: dict) -> dict:
 class Rules(BaseModel):
     score_values: str
     max_follow_ups: int  # per subdimension
-    max_follow_ups_total: int  # for the whole conversation
+    max_follow_ups_per_dimension: int
     max_redirects: int  # off-topic messages steered back, per subdimension
     max_clarifications: int  # respondent questions answered, per subdimension
     follow_up_purpose: str
@@ -79,3 +79,12 @@ class Rubric(BaseModel):
 def load_rubric(path: Path = RUBRIC_PATH) -> Rubric:
     """Read the rubric file and check that it has the expected structure."""
     return Rubric.model_validate_json(Path(path).read_text(encoding="utf-8"))
+
+
+def only_dimensions(rubric: Rubric, names: list[str]) -> Rubric:
+    """A copy of the rubric with only the named dimensions, in rubric order.
+    For testing with fewer dimensions (the DIMENSIONS setting)."""
+    unknown = set(names) - {d.name for d in rubric.dimensions}
+    if unknown:
+        raise ValueError(f"Unknown dimensions: {sorted(unknown)}")
+    return rubric.model_copy(update={"dimensions": [d for d in rubric.dimensions if d.name in names]})

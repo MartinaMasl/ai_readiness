@@ -1,14 +1,15 @@
 """The two model calls, check and score.
 
 This module builds the prompt, calls OpenAI with the `openai` package and
-checks the model's reply. The Worker (step 5) and the test script
-(scripts/try_prompts.py) both use it, so they run the same code.
+checks the model's reply. The Worker (through OpenAIModel) and the test
+script (scripts/try_prompts.py) both use it, so they run the same code.
 
 Structured output: the Pydantic models below are passed to the `openai`
 package, which turns them into the JSON schema sent to OpenAI and
 validates the reply with them.
 """
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -39,6 +40,7 @@ class CheckResult(StrictModel):
     follow_up_needed: bool
     targets: list[str]  # up to two missing criteria the follow-up asks about
     reply: str | None
+    next_question: str | None  # opens the next subdimension if the flow moves on
 
 
 class CriterionEvidence(StrictModel):
@@ -56,6 +58,15 @@ class ScoreResult(StrictModel):
 
 
 # --- Prompts ----------------------------------------------------------------
+
+# The prompt files sit next to this file; wrangler.jsonc bundles them into the Worker.
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+def load_prompt(name: str) -> tuple[str, str]:
+    """The version and the template of prompts/<name>.md."""
+    return parse_prompt_file((PROMPTS_DIR / f"{name}.md").read_text(encoding="utf-8"))
+
 
 def parse_prompt_file(text: str) -> tuple[str, str]:
     """Split a prompt file into its version (first line, "version: ...")
@@ -98,10 +109,22 @@ def format_transcript(messages: list[dict]) -> str:
     return "\n\n".join(f"{names[m['role']]}: {m['text']}" for m in messages)
 
 
-def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict]) -> str:
+def format_next_topic(next_sub: Subdimension | None) -> str:
+    if next_sub is None:
+        return "There is no next topic; this is the last one. next_question is null."
+    return (
+        f"Name: {next_sub.name}\n"
+        f"Definition: {next_sub.definition}\n"
+        f"Core question: {next_sub.opening_question}"
+    )
+
+
+def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict],
+                 next_sub: Subdimension | None) -> str:
     return fill(template, {
         "name": sub.name,
         "definition": sub.definition,
+        "next_topic": format_next_topic(next_sub),
         "criteria": format_criteria(sub),
         "levels": format_levels(sub),
         "rules": format_rules([rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans]),
@@ -143,6 +166,37 @@ async def call_model(client, model_id: str, temperature: float, prompt: str,
     return message.parsed, completion.model
 
 
+class OpenAIModel:
+    """What the flow calls: the check and the score with fixed settings.
+    Both return the log format below. (The tests use a fake with the same
+    two methods.)"""
+
+    def __init__(self, client, model_id: str, temperature: float):
+        self.client = client  # an openai.AsyncOpenAI
+        self.model_id = model_id
+        self.temperature = temperature
+        self.check_version, self.check_template = load_prompt("check")
+        self.score_version, self.score_template = load_prompt("score")
+
+    def info(self) -> dict:
+        """Model and prompt versions for the conversation log."""
+        return {
+            "model": {"id": self.model_id, "settings": {"temperature": self.temperature}},
+            "prompt_versions": {"check": self.check_version, "score": self.score_version},
+        }
+
+    async def check(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
+                    next_sub: Subdimension | None) -> dict:
+        prompt = check_prompt(self.check_template, rubric, sub, messages, next_sub)
+        result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, CheckResult)
+        return check_to_log(result, sub, next_sub)
+
+    async def score(self, rubric: Rubric, sub: Subdimension, messages: list[dict]) -> dict:
+        prompt = score_prompt(self.score_template, rubric, sub, messages)
+        result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, ScoreResult)
+        return score_to_log(result, sub)
+
+
 # --- Into the log format (CLAUDE.md) ----------------------------------------
 
 def _check_criterion_ids(sub: Subdimension, ids: list[str]) -> None:
@@ -151,7 +205,7 @@ def _check_criterion_ids(sub: Subdimension, ids: list[str]) -> None:
         raise ValueError(f"Expected criteria {expected}, the model returned {ids}")
 
 
-def check_to_log(result: CheckResult, sub: Subdimension) -> dict:
+def check_to_log(result: CheckResult, sub: Subdimension, next_sub: Subdimension | None) -> dict:
     """The check as it is stored in the state and the log, after checking
     that the model's answer is consistent."""
     _check_criterion_ids(sub, [c.criterion for c in result.criteria])
@@ -174,12 +228,15 @@ def check_to_log(result: CheckResult, sub: Subdimension) -> dict:
     needs_reply = result.message_type in ("question", "off_topic") or result.follow_up_needed
     if needs_reply and not result.reply:
         raise ValueError("A reply is needed but the model did not write one")
+    if next_sub is not None and not result.next_question:
+        raise ValueError("There is a next subdimension but the model wrote no next question")
     return {
         "message_type": result.message_type,
         "criteria": {c.criterion: {"status": c.status, "quote": c.quote} for c in result.criteria},
         "follow_up_needed": result.follow_up_needed,
         "targets": list(result.targets),
         "reply": result.reply if needs_reply else None,
+        "next_question": result.next_question if next_sub is not None else None,
     }
 
 

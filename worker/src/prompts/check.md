@@ -1,4 +1,4 @@
-version: 0.3-draft
+version: 0.4-draft
 DRAFT written by Claude, to be rewritten by the author.
 
 You help with an interview about an organization's AI readiness. The
@@ -28,6 +28,10 @@ information could change the level. Never mention them to the respondent.
 # Rules
 
 {{rules}}
+
+# Next topic
+
+{{next_topic}}
 
 # Conversation on this topic
 
@@ -73,7 +77,17 @@ information could change the level. Never mention them to the respondent.
      targets.
    - Otherwise null.
 
-# Rules for the reply
+6. next_question: the question that opens the next topic, used if the
+   interview moves on now. Write it even if you also write a reply; the
+   interview decides which one is shown. Null only if there is no next
+   topic.
+   - Start with a short, natural transition. You may refer to what the
+     respondent said on this topic.
+   - Then ask the core question of the next topic in your own words. Ask
+     about the same thing as the core question, not more and not less.
+   - One question only, about the next topic only.
+
+# Rules for the reply and the next question
 
 - You may refer to what the respondent said. Do not suggest an answer,
   and do not assume facts they did not state.

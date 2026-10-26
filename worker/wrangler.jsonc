@@ -5,13 +5,14 @@
 	"compatibility_flags": [
 		"python_workers"
 	],
-	// Bundle .json files in src/ (the rubric) so the Python code can read them.
-	// By default only .py files are included.
+	// Bundle .json and .md files in src/ (the rubric and the prompts) so the
+	// Python code can read them. By default only .py files are included.
 	"rules": [
 		{
 			"type": "Data",
 			"globs": [
-				"**/*.json"
+				"**/*.json",
+				"**/*.md"
 			],
 			"fallthrough": true
 		}
@@ -25,10 +26,16 @@
 			"database_id": "c33713ab-8d12-44c9-976d-931facdbce8c"
 		}
 	],
-	// Settings readable by the Worker. TEST_MODE "1" makes the API return the
-	// check details for the chat page; set it only locally, in .dev.vars.
+	// Settings readable by the Worker; .dev.vars overrides them locally.
+	// The API key is a secret (OPENAI_API_KEY), never here.
+	// TEST_MODE "1" makes the API return the check details for the chat page;
+	// set it only locally. DIMENSIONS limits a conversation to some dimensions,
+	// e.g. "Data" (empty: all dimensions); also only for testing.
 	"vars": {
-		"TEST_MODE": "0"
+		"MODEL_ID": "gpt-6.1-sol",
+		"TEMPERATURE": "1",
+		"TEST_MODE": "0",
+		"DIMENSIONS": ""
 	},
 	// Files in public/ are served directly (so / shows index.html).
 	// Requests that match no file, like /api, go to the FastAPI app.
