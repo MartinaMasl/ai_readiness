@@ -98,15 +98,21 @@ discussed in the thesis as part of the chatbot format):
 
 6. Score (model call, `worker/src/prompts/score.md`): level, evidence quotes
    ("not applicable: <condition>" for criteria that do not apply),
-   reason, why not higher, flags.
+   reason, why not higher, flags. Scoring runs in the background after
+   the response with the next question is sent (`wait_until`), so the
+   respondent never waits for it.
 7. Next subdimension, back to 2, until all are done.
-8. Report (code): scores, levels and the report described below.
-9. Save: write the conversation log after every subdimension.
+8. Report (code): scores, levels and the report described below. If a
+   score is still missing, the report endpoint answers 202 and the page
+   asks again; a score missing for over 60 seconds (the background score
+   failed) is calculated by the report endpoint itself.
+9. Save: each scored subdimension is saved as one row with its level and
+   its log entry.
 
 The app runs on Cloudflare Workers, which keep nothing in memory between
 requests. So the flow runs one step per request: each answer request
 loads the conversation state from the database (current subdimension,
-the counters, transcript, checks, scores), does one step and
+the counters, transcript, checks, finished subdimensions), does one step and
 saves the state again. The "pause for the respondent's answer" is the
 end of a request.
 
@@ -170,14 +176,17 @@ All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
 - `POST /api/conversations/{id}/answer`: takes the respondent's answer,
   runs the next step of the flow and returns the next chatbot message,
   or `done: true` when everything is scored.
-- `GET /api/conversations/{id}/report`: returns the report data as JSON.
+- `GET /api/conversations/{id}/report`: returns the report data as JSON,
+  or 202 while the last scores are still being calculated.
 
 ## The conversation log
 
-One JSON log per conversation, stored in the Cloudflare D1 database
-(Workers cannot write files, so there is no `logs/` folder). It is
-written after every subdimension so nothing is lost if a conversation
-stops. The author reads these logs to find mistakes and improve the
+One log per conversation, stored in the Cloudflare D1 database
+(Workers cannot write files, so there is no `logs/` folder): a header in
+`logs`, written at the start, and one entry per subdimension in
+`subdimension_results`, written as soon as the subdimension is scored, so
+nothing is lost if a conversation stops. `worker/scripts/show_log.py`
+puts them back together into the format below. The author reads these logs to find mistakes and improve the
 prompts, so they must contain everything needed to see why a score was
 given.
 
@@ -233,26 +242,29 @@ chatbot never reads the log back.
 
 ## The database tables
 
-D1 has two tables, one row per conversation in each, both holding JSON
-(created by `worker/migrations/`, read and written only in `storage.py`).
+D1 has three tables, connected by the conversation id
+(`subdimension_results.conversation_id` is a foreign key to
+`conversations.id`). They are created by `worker/migrations/` and read
+and written only in `storage.py`. Each has one kind of writer, so a
+background score and an answer never overwrite each other.
 
 - `conversations`: the chatbot's working memory, so the flow can
   continue. Workers forget everything between requests, so every answer
   request loads this state, does one step and saves it again. It holds
-  only what the next step needs: current subdimension, follow-ups asked,
-  transcript, checks of the current subdimension, the levels scored so
-  far, and whether the conversation is done. The report is calculated
-  from the levels here.
-- `logs`: the author's research record, so she can see why each score
-  was given and improve the prompts. The chatbot writes it after every
-  subdimension and never reads it. It keeps everything the state drops:
-  all checks with quotes, the full score (evidence, reason, why not
-  higher, flags), the empty `review` block, and the model, rubric and
-  prompt versions.
+  only what the next step needs: current subdimension, the counters,
+  transcript, checks of the current subdimension, the finished
+  subdimensions (what is needed to score them), and whether the
+  conversation is done. Written by the answer requests.
+- `logs`: the log header: id, start time, model id and settings, rubric
+  and prompt versions. Written once at the start.
+- `subdimension_results`: one row per scored subdimension: its level
+  (the report is calculated from these) and its log entry (core
+  question, transcript, all checks with quotes, counters, the full score
+  and the empty `review` block). Written by the background score.
 
-Keep them separate: the flow must never depend on the log, so earlier
-reasons and evidence cannot influence later scores, and the author's
-review cannot affect a running conversation.
+The flow never reads the log entries back, so earlier reasons and
+evidence cannot influence later scores, and the author's review cannot
+affect a running conversation.
 
 ## Stack
 
@@ -301,9 +313,11 @@ worker/src/scoring.py        means and levels
 worker/src/report.py         report data as JSON
 worker/src/flow.py           the workflow, one step per request
 worker/src/llm.py            prompts, the two model calls (OpenAIModel) and reply checks
-worker/src/storage.py        reads and writes state and logs in D1
+worker/src/storage.py        reads and writes state, log header and results in D1
+worker/migrations/           SQL that creates the D1 tables
 worker/tests/                tests; fakes.py is a fake model for the flow tests
 worker/scripts/try_prompts.py  step 4: runs both prompts on hand-written answers
+worker/scripts/show_log.py   prints one conversation's whole log
 DECISIONS.md
 ```
 

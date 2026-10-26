@@ -2379,8 +2379,16 @@ function showError(message) {
   var id = new URLSearchParams(location.search).get('id');
   if (!id) { showError('No conversation id in the address.'); return; }
   try {
-    var response = await fetch('/api/conversations/' + encodeURIComponent(id) + '/report');
-    if (!response.ok) { showError('The report could not be loaded (' + response.status + ').'); return; }
+    // 202 means the last scores are still being calculated: ask again every 3 seconds.
+    var response;
+    for (var attempt = 0; attempt < 40; attempt++) {
+      response = await fetch('/api/conversations/' + encodeURIComponent(id) + '/report');
+      if (response.status !== 202) break;
+      showError('Your results are being prepared…');
+      await new Promise(function(resolve){ setTimeout(resolve, 3000); });
+    }
+    if (!response.ok || response.status === 202) { showError('The report could not be loaded (' + response.status + ').'); return; }
+    document.getElementById('reportError').hidden = true;
     var report = await response.json();
 
     document.getElementById('overallScore').textContent = report.overall.score_display;

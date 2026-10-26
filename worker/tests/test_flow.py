@@ -11,11 +11,22 @@ SUBS = flow.all_subdimensions(RUBRIC)
 
 
 def start(rubric=RUBRIC):
-    return flow.new_conversation(rubric, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
+    state, log = flow.new_conversation(rubric, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
+    # Stand-ins for the subdimension_results table: the log entries and the levels.
+    log["subdimensions"] = []
+    log["levels"] = {}
+    return state, log
 
 
 def say(state, log, text, rubric=RUBRIC):
-    return asyncio.run(flow.handle_answer(rubric, state, log, text, FakeModel()))
+    """One answer. Like main.py, a finished subdimension is then scored and
+    its result kept. Returns (message, done, a subdimension was finished)."""
+    message, done, finished = asyncio.run(flow.handle_answer(rubric, state, text, FakeModel()))
+    if finished:
+        entry = asyncio.run(flow.score_subdimension(rubric, finished, FakeModel()))
+        log["subdimensions"].append(entry)
+        log["levels"].setdefault(finished["dimension"], {})[finished["subdimension"]] = entry["score"]["level"]
+    return message, done, finished is not None
 
 
 def run_whole_conversation(rubric=RUBRIC):
@@ -27,11 +38,11 @@ def run_whole_conversation(rubric=RUBRIC):
 
 
 def test_starts_with_intro_and_first_opening_question():
-    state, log = start()
+    state, header = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
     assert state["transcript"][0]["text"] == flow.INTRO
     assert state["transcript"][1]["text"] == SUBS[0][1].opening_question
-    assert log["rubric_version"] == RUBRIC.version
-    assert log["subdimensions"] == []
+    assert set(header) == {"id", "started_at", "model", "rubric_version", "prompt_versions"}
+    assert header["rubric_version"] == RUBRIC.version
 
 
 def test_first_answer_gets_a_follow_up_then_next_opening_question():
@@ -50,8 +61,8 @@ def test_whole_conversation_scores_every_subdimension():
     state, log, replies = run_whole_conversation()
     assert replies[-1] == (flow.CLOSING, True, True)
     for dimension_name, sub in SUBS:
-        assert sub.name in state["scores"][dimension_name]
-    build_report(RUBRIC, state["scores"])  # report works on the result
+        assert sub.name in log["levels"][dimension_name]
+    build_report(RUBRIC, log["levels"])  # report works on the result
 
 
 def follow_ups_per_dimension(log):
@@ -171,9 +182,9 @@ def test_conversation_with_only_some_dimensions():
     data_only = only_dimensions(RUBRIC, ["Data"])
     state, log, replies = run_whole_conversation(data_only)
     assert state["dimensions"] == ["Data"]
-    assert list(state["scores"]) == ["Data"]
+    assert list(log["levels"]) == ["Data"]
     assert [e["subdimension"] for e in log["subdimensions"]] == [s.name for s in data_only.dimensions[0].subdimensions]
-    report = build_report(data_only, state["scores"])
+    report = build_report(data_only, log["levels"])
     assert [d["name"] for d in report["dimensions"]] == ["Data"]
 
 
@@ -189,3 +200,24 @@ def test_only_the_first_question_is_fixed_and_the_log_keeps_the_core_question():
     assert first["transcript"][0]["text"] == SUBS[0][1].opening_question  # fixed
     assert second["transcript"][0]["text"] == f"[fake next] {SUBS[1][1].opening_question}"  # written by the model
     assert second["core_question"] == SUBS[1][1].opening_question
+
+
+def test_scoring_is_not_part_of_the_answer_step():
+    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
+    asyncio.run(flow.handle_answer(RUBRIC, state, "first answer", FakeModel()))
+    message, done, finished = asyncio.run(flow.handle_answer(RUBRIC, state, "second answer", FakeModel()))
+    assert finished["subdimension"] == SUBS[0][1].name and finished["position"] == 0
+    assert "score" not in finished  # scored afterwards, by score_subdimension
+    assert [m["role"] for m in finished["transcript"]] == ["chatbot", "respondent", "chatbot", "respondent"]
+    assert state["finished"] == [finished]
+
+
+def test_unscored_lists_finished_subdimensions_without_a_level():
+    state, log = start()
+    say(state, log, "first answer")
+    say(state, log, "second answer")  # first subdimension finished and scored
+    say(state, log, "I don't know")  # second finished and scored
+    assert flow.unscored(state, log["levels"]) == []
+    first_dimension = SUBS[0][0]
+    without_second = {first_dimension: {SUBS[0][1].name: 4}}
+    assert [f["subdimension"] for f in flow.unscored(state, without_second)] == [SUBS[1][1].name]
