@@ -27,18 +27,6 @@ def maturity_level(score: Fraction | int) -> int:
     return math.floor(score)
 
 
-def main_gap(subdimension_scores: list[int]) -> int | None:
-    """Position of the lowest-scoring subdimension, or None if there is no gap.
-
-    On a tie the subdimension listed first is taken. If the lowest score
-    is 5, there is no gap.
-    """
-    lowest_score = min(subdimension_scores)
-    if lowest_score == 5:
-        return None
-    return subdimension_scores.index(lowest_score)
-
-
 def display(score: Fraction) -> str:
     """Score rounded to two decimals for display."""
     return f"{float(score):.2f}"

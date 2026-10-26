@@ -33,12 +33,6 @@ def build_report(rubric: Rubric, scores: Scores) -> dict:
         dimension_scores.append(score)
         level = _level(rubric, score)
 
-        gap = None
-        gap_index = scoring.main_gap(sub_scores)
-        if gap_index is not None:
-            sub = dimension.subdimensions[gap_index]
-            gap = {"subdimension": sub.name, "text": sub.gap[sub_scores[gap_index]]}
-
         dimensions.append(
             {
                 "name": dimension.name,
@@ -47,7 +41,6 @@ def build_report(rubric: Rubric, scores: Scores) -> dict:
                 "score_display": scoring.display(score),
                 "level": level,
                 "report_text": dimension.report_levels[level["number"]],
-                "gap": gap,
             }
         )
 

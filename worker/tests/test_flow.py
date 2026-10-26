@@ -3,11 +3,16 @@ from report import build_report
 from rubric import load_rubric
 
 RUBRIC = load_rubric()
+RULES = RUBRIC.rules
 SUBS = flow.all_subdimensions(RUBRIC)
 
 
+def start():
+    return flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+
+
 def run_whole_conversation():
-    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+    state, log = start()
     replies = []
     while not state["done"]:
         replies.append(flow.handle_answer(RUBRIC, state, log, "an answer"))
@@ -15,7 +20,7 @@ def run_whole_conversation():
 
 
 def test_starts_with_intro_and_first_opening_question():
-    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+    state, log = start()
     assert state["transcript"][0]["text"] == flow.INTRO
     assert state["transcript"][1]["text"] == SUBS[0][1].opening_question
     assert log["rubric_version"] == RUBRIC.version
@@ -23,10 +28,11 @@ def test_starts_with_intro_and_first_opening_question():
 
 
 def test_first_answer_gets_a_follow_up_then_next_opening_question():
-    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+    state, log = start()
     message, done, log_changed = flow.handle_answer(RUBRIC, state, log, "first answer")
-    assert message.startswith("Thank you. Could you tell me a bit more?")
+    assert message.startswith("[fake] Could you tell me a bit more?")
     assert (done, log_changed) == (False, False)
+    assert state["follow_ups"] == 1 and state["follow_ups_total"] == 1
 
     message, done, log_changed = flow.handle_answer(RUBRIC, state, log, "second answer")
     assert message == SUBS[1][1].opening_question
@@ -35,41 +41,90 @@ def test_first_answer_gets_a_follow_up_then_next_opening_question():
 
 def test_whole_conversation_scores_every_subdimension():
     state, log, replies = run_whole_conversation()
-    assert len(replies) == 2 * len(SUBS)  # one answer + one follow-up answer each
     assert replies[-1] == (flow.CLOSING, True, True)
     for dimension_name, sub in SUBS:
         assert sub.name in state["scores"][dimension_name]
     build_report(RUBRIC, state["scores"])  # report works on the result
 
 
-def test_follow_ups_never_exceed_the_rubric_limit():
-    state, log, _ = run_whole_conversation()
-    for entry in log["subdimensions"]:
-        chatbot_messages = [m for m in entry["transcript"] if m["role"] == "chatbot"]
-        follow_ups = len(chatbot_messages) - 1  # minus the opening question
-        assert follow_ups <= RUBRIC.rules.max_follow_ups
+def test_follow_ups_respect_both_limits():
+    _, log, _ = run_whole_conversation()
+    per_subdimension = [entry["counters"]["follow_ups"] for entry in log["subdimensions"]]
+    assert all(n <= RULES.max_follow_ups for n in per_subdimension)
+    assert sum(per_subdimension) <= RULES.max_follow_ups_total
 
 
-def test_clarification_request_is_answered_and_counts_towards_the_limit():
-    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+def test_total_follow_up_budget_runs_out():
+    # The fake check wants a follow-up after every first answer, so the
+    # budget is used up after max_follow_ups_total subdimensions; later
+    # subdimensions are scored straight after the first answer.
+    _, log, replies = run_whole_conversation()
+    follow_ups = [entry["counters"]["follow_ups"] for entry in log["subdimensions"]]
+    budget = min(RULES.max_follow_ups_total, len(SUBS) * RULES.max_follow_ups)
+    assert sum(follow_ups) == budget
+    assert log["subdimensions"][-1]["counters"]["follow_ups_total"] == budget
+    if len(SUBS) * RULES.max_follow_ups > RULES.max_follow_ups_total:
+        assert follow_ups[-1] == 0
+        assert [c["action"] for c in log["subdimensions"][-1]["checks"]] == ["score"]
+    assert len(replies) == len(SUBS) + budget
+
+
+def test_respondent_question_is_answered_and_has_its_own_limit():
+    state, log = start()
     first, second = SUBS[0][1], SUBS[1][1]
+    for _ in range(RULES.max_clarifications):
+        message, _, _ = flow.handle_answer(RUBRIC, state, log, "What do you mean?")
+        assert message.startswith("[fake] The model would answer") and first.opening_question in message
+    assert state["clarifications"] == RULES.max_clarifications
+    assert state["follow_ups"] == 0 and state["redirects"] == 0  # other counters unchanged
 
-    message, done, _ = flow.handle_answer(RUBRIC, state, log, "What do you mean?")
-    assert message.startswith("[fake]") and first.opening_question in message
-    assert flow.check_summary(RUBRIC, state) is None  # no check box for a clarification
-
-    flow.handle_answer(RUBRIC, state, log, "Sorry, what?")  # second and last follow-up
-    message, _, log_changed = flow.handle_answer(RUBRIC, state, log, "Still unclear?")
-    assert message == second.opening_question  # limit reached: scored and moved on
-    assert log_changed
-    assert [c["message_type"] for c in log["subdimensions"][0]["checks"]] == ["clarification_request"] * 3
+    message, _, _ = flow.handle_answer(RUBRIC, state, log, "And what else?")
+    assert message == second.opening_question  # limit reached: scored with what there is
+    assert log["subdimensions"][0]["counters"]["clarifications"] == RULES.max_clarifications
 
 
-def test_log_has_one_entry_per_subdimension_in_the_agreed_shape():
+def test_off_topic_twice_is_redirected_then_scored():
+    state, log = start()
+    first, second = SUBS[0][1], SUBS[1][1]
+    for _ in range(RULES.max_redirects):
+        message, _, _ = flow.handle_answer(RUBRIC, state, log, "[off] Nice weather today.")
+        assert message.startswith("[fake] The model would steer back") and first.opening_question in message
+    assert state["redirects"] == RULES.max_redirects and state["subdimension_index"] == 0
+
+    message, _, _ = flow.handle_answer(RUBRIC, state, log, "[off] Still the weather.")
+    assert message == second.opening_question
+    entry = log["subdimensions"][0]
+    assert [c["action"] for c in entry["checks"]] == ["redirect"] * RULES.max_redirects + ["score"]
+    assert entry["counters"]["redirects"] == RULES.max_redirects
+
+
+def test_dont_know_is_not_asked_again():
+    state, log = start()
+    message, _, log_changed = flow.handle_answer(RUBRIC, state, log, "I don't know, sorry.")
+    assert message == SUBS[1][1].opening_question  # nothing left to ask: scored
+    assert log_changed and state["follow_ups"] == 0
+    check = log["subdimensions"][0]["checks"][0]
+    assert check["message_type"] == "dont_know"
+    assert {c["status"] for c in check["criteria"].values()} == {"dont_know"}
+
+
+def test_not_applicable_monitoring_is_logged_and_never_a_follow_up_target():
+    state, log = start()
+    flow.handle_answer(RUBRIC, state, log, "first answer")
+    check = state["checks"][0]
+    sub = SUBS[0][1]
+    monitoring = next(c for c in sub.criteria if c.not_applicable_if)
+    assert check["criteria"][monitoring.id]["status"] == "not_applicable"
+    assert monitoring.id not in check["targets"]
+
+
+def test_log_entry_has_the_agreed_shape():
     _, log, _ = run_whole_conversation()
     assert [e["subdimension"] for e in log["subdimensions"]] == [sub.name for _, sub in SUBS]
     entry = log["subdimensions"][0]
-    assert set(entry) == {"subdimension", "transcript", "checks", "score", "review"}
+    assert set(entry) == {"subdimension", "transcript", "checks", "counters", "score", "review"}
+    assert set(entry["counters"]) == {"follow_ups", "clarifications", "redirects", "follow_ups_total"}
+    assert set(entry["checks"][0]) == {"message_type", "criteria", "follow_up_needed", "targets", "reply", "action"}
     assert [m["role"] for m in entry["transcript"]] == ["chatbot", "respondent", "chatbot", "respondent"]
     assert entry["review"] == {"my_level": None, "error_type": None, "note": None}
 
@@ -79,19 +134,17 @@ def test_outline_lists_every_subdimension_in_order():
     assert names == [sub.name for _, sub in SUBS]
 
 
-def test_check_summary_only_while_a_follow_up_is_open():
-    state, log = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00")
+def test_check_summary_for_the_test_mode_box():
+    state, log = start()
     assert flow.check_summary(RUBRIC, state) is None
 
     flow.handle_answer(RUBRIC, state, log, "first answer")  # follow-up asked
-    summary = flow.check_summary(RUBRIC, state)
     first = SUBS[0][1]
-    assert summary == {
-        "subdimension": first.name,
-        "covered": 0,
-        "total": len(first.criteria),
-        "follow_up_criterion": first.criteria[0].description,
-    }
+    summary = flow.check_summary(RUBRIC, state)
+    assert summary["message_type"] == "answer" and summary["action"] == "follow_up"
+    assert summary["total"] == len(first.criteria)
+    assert summary["covered"] == len(first.criteria) - 2  # two criteria missing in the fake check
+    assert summary["follow_up_criteria"] == [c.description for c in first.criteria[:2]]
 
     flow.handle_answer(RUBRIC, state, log, "second answer")  # scored, next subdimension
     assert flow.check_summary(RUBRIC, state) is None

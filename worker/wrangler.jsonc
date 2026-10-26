@@ -25,6 +25,11 @@
 			"database_id": "c33713ab-8d12-44c9-976d-931facdbce8c"
 		}
 	],
+	// Settings readable by the Worker. TEST_MODE "1" makes the API return the
+	// check details for the chat page; set it only locally, in .dev.vars.
+	"vars": {
+		"TEST_MODE": "0"
+	},
 	// Files in public/ are served directly (so / shows index.html).
 	// Requests that match no file, like /api, go to the FastAPI app.
 	"assets": {

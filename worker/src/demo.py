@@ -2,10 +2,10 @@
 
 Temporary: replaced by scores from D1 in step 3.
 
-- "demo": the real rubric (only Data so far) with the worked example scores.
-- "demo-four": four dimensions so the radar chart has four axes. People,
-  Strategy and Technology reuse the Data texts as placeholders; they are
-  not the rubric.
+- "demo": the real rubric with the worked example scores.
+- "demo-four": four dimensions so the radar chart has four axes. A
+  dimension not yet in the rubric (Technology) reuses the Data texts as a
+  placeholder; it is not the rubric.
 """
 
 from rubric import Rubric
@@ -21,8 +21,9 @@ WORKED_EXAMPLE = {
 
 def four_dimension_placeholder(rubric: Rubric) -> Rubric:
     data = rubric.dimensions[0]
-    copies = [data.model_copy(update={"name": name}) for name in ("People", "Strategy", "Technology")]
-    return rubric.model_copy(update={"dimensions": [data] + copies})
+    present = [d.name for d in rubric.dimensions]
+    copies = [data.model_copy(update={"name": name}) for name in WORKED_EXAMPLE if name not in present]
+    return rubric.model_copy(update={"dimensions": rubric.dimensions + copies})
 
 
 def worked_example_scores(rubric: Rubric) -> dict[str, dict[str, int]]:

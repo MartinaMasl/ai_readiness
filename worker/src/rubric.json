@@ -1,11 +1,16 @@
 {
-  "version": "0.1",
+  "version": "0.7",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
-    "max_follow_ups": 2,
+    "max_follow_ups": 1,
+    "max_follow_ups_per_dimension": 2,
+    "max_redirects": 2,
+    "max_clarifications": 3,
+    "follow_up_purpose": "Ask a follow-up only if the missing information could change the level. One follow-up may ask about up to two missing criteria.",
     "mixed_evidence": "Choose the level that fits best overall. If the evidence sits between two levels, choose the lower one.",
     "plans": "Score the current state. Plans and intentions do not count.",
-    "insufficient_evidence": "If there is evidence for at least one criterion, score on that evidence and set the flag 'insufficient_evidence'. If there is no evidence at all, the score is 0 and the flag 'insufficient_evidence' is set."
+    "insufficient_evidence": "Set the flag 'insufficient_evidence' when at least one criterion has no evidence, for example because the respondent did not know or the follow-up limit was reached. A criterion that is not applicable does not count as missing evidence. If some criteria have evidence, score on that evidence. If no criterion has evidence, the score is 0.",
+    "not_applicable": "A criterion is not applicable when the condition in its 'not_applicable_if' is met. Do not ask about it, and do not treat it as missing evidence."
   },
   "scale": {
     "0": {
@@ -69,7 +74,8 @@
             {
               "id": "monitoring",
               "description": "Whether the way of finding data is maintained, monitored and improved.",
-              "look_for": "Someone responsible for keeping the catalog or inventory current, checks on coverage or outdated entries, and use of feedback to improve it. If no organization-wide mechanism exists, treat this criterion as covered."
+              "look_for": "Someone responsible for keeping the catalog or inventory current, checks on coverage or outdated entries, and use of feedback to improve it.",
+              "not_applicable_if": "No organization-wide mechanism exists."
             }
           ],
           "levels": {
@@ -79,13 +85,6 @@
             "3": "Data is located through a documented, organization-wide mechanism, such as a data catalog or central inventory, with standard procedures and clearly defined contact points. Finding data no longer depends on personal knowledge or informal relationships.",
             "4": "The organization-wide system for finding data is actively monitored and measured, for example through its coverage, how current its entries are, and how long employees need to find data. Gaps and outdated entries are identified and corrected, and responsibility for maintaining the system is assigned.",
             "5": "The organization-wide system for finding data is continuously improved based on usage data and employee feedback, supported by advanced tooling such as automated metadata capture and search. Problems in finding data are used systematically to refine the system."
-          },
-          "gap": {
-            "0": "There is no way to find data; the next level requires that employees can at least find data through their own searching or asking.",
-            "1": "Finding data depends on individual effort; the next level requires established channels, such as known contacts or team lists.",
-            "2": "Data is found through informal channels within teams; the next level requires a documented, organization-wide mechanism such as a data catalog.",
-            "3": "A documented, organization-wide way to find data exists; the next level requires monitoring its coverage and currency, with assigned maintenance.",
-            "4": "The system for finding data is monitored; the next level requires improving it continuously based on usage data and feedback."
           },
           "examples": []
         },
@@ -112,7 +111,8 @@
             {
               "id": "monitoring",
               "description": "Whether ownership is reviewed, monitored and improved.",
-              "look_for": "Regular reviews of ownership records, tracking of datasets without an owner, handling of owners who leave, and use of feedback to improve the practice. If ownership is not formally assigned, treat this criterion as covered."
+              "look_for": "Regular reviews of ownership records, tracking of datasets without an owner, handling of owners who leave, and use of feedback to improve the practice.",
+              "not_applicable_if": "Ownership is not formally assigned."
             }
           ],
           "levels": {
@@ -122,13 +122,6 @@
             "3": "Data ownership is formally assigned and documented across the organization according to one standard. Responsibility for the accuracy, access, and maintenance of each dataset is unambiguous and is tied to roles, not to specific individuals.",
             "4": "Ownership is actively monitored and measured, for example through the share of datasets with an assigned owner and regular reviews of ownership records. Gaps, such as datasets without an owner or owners who have left, are identified and corrected.",
             "5": "Ownership practices are continuously improved based on monitoring results and feedback from owners and data users. Ownership is built into tools and processes, so that, for example, every new dataset is assigned an owner when it is created."
-          },
-          "gap": {
-            "0": "Data ownership is not recognized; the next level requires that individuals at least take responsibility for datasets when problems occur.",
-            "1": "No one clearly owns the data; the next level requires owners who are known within teams.",
-            "2": "Ownership is informal; the next level requires assigned, documented owners.",
-            "3": "Ownership is formally assigned; the next level requires monitoring it, for example for datasets without an owner.",
-            "4": "Ownership is monitored; the next level requires improving it continuously and assigning owners when datasets are created."
           },
           "examples": []
         },
@@ -155,7 +148,8 @@
             {
               "id": "monitoring",
               "description": "Whether data quality is measured, monitored and improved.",
-              "look_for": "Quality metrics or thresholds, regular reporting, correction of deviations, fixing recurring problems at their source, and automated monitoring. If no organization-wide rules exist, treat this criterion as covered."
+              "look_for": "Quality metrics or thresholds, regular reporting, correction of deviations, fixing recurring problems at their source, and automated monitoring.",
+              "not_applicable_if": "No organization-wide rules exist."
             }
           ],
           "levels": {
@@ -166,12 +160,255 @@
             "4": "Data quality is measured against defined thresholds for accuracy, consistency, validity, uniqueness, and integrity, and the results are monitored. Rules are enforced through system controls (e.g., required fields, validation checks), and deviations are identified and corrected.",
             "5": "Data quality is continuously improved: measurement results are used to refine quality rules and controls, and recurring problems are fixed at their source. Monitoring is largely automated, and data can be used for analytics and AI without additional preparation."
           },
-          "gap": {
-            "0": "Data quality is not managed; the next level requires that quality problems are at least fixed when someone notices them.",
-            "1": "Quality problems are fixed case by case; the next level requires basic checks that teams repeat.",
-            "2": "Quality checks are informal and differ between teams; the next level requires documented, organization-wide quality rules.",
-            "3": "Quality rules are documented; the next level requires measuring quality against thresholds and enforcing rules through system controls.",
-            "4": "Data quality is measured and controlled; the next level requires using the results to improve the rules and fix recurring problems at their source."
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "People",
+      "definition": "The extent to which an organization's workforce is culturally, technically, and structurally prepared to adopt and work with AI.",
+      "report_levels": {
+        "0": "Overall, no meaningful workforce readiness for AI is in place, and the need for it has not yet been recognized.",
+        "1": "Overall, AI knowledge, skills and openness exist only among individuals acting on their own initiative, so readiness is unpredictable and varies across the organization.",
+        "2": "Overall, some teams are open to AI, have relevant skills and learn together, but this is confined to specific teams or individuals rather than the whole organization.",
+        "3": "Overall, the organization has an organization-wide approach to AI culture, roles and training that is documented, consistently applied and does not depend on specific individuals.",
+        "4": "Overall, AI adoption, skills and training are actively monitored and measured, and gaps are identified and addressed.",
+        "5": "Overall, the workforce's readiness for AI is continuously improved based on monitoring and feedback, and learning and experimentation with AI are part of everyday work."
+      },
+      "subdimensions": [
+        {
+          "name": "Culture",
+          "definition": "The extent to which the organization fosters experimentation, innovation, collaboration, and learning, enabling employees to adapt to changing technologies and ways of working.",
+          "opening_question": "How would you describe the way people in your organization approach AI today, both in their attitude and in their everyday work?",
+          "criteria": [
+            {
+              "id": "attitude",
+              "description": "Employees' general attitude towards AI and their confidence in using it.",
+              "look_for": "Interest, curiosity, scepticism, uncertainty about AI's value, lack of knowledge or confidence, and differences between groups of employees."
+            },
+            {
+              "id": "use",
+              "description": "How AI is used in everyday work and whether employees are allowed and able to use it.",
+              "look_for": "AI as a standard part of workflows, regular use only in certain departments, individuals trying free tools on their own, access to licensed tools, and whether use is permitted and guided."
+            },
+            {
+              "id": "participation",
+              "description": "Whether employees are encouraged and able to experiment with AI and propose AI ideas.",
+              "look_for": "Employees proposing or testing AI ideas, involvement in pilots, support from management, and whether this is organization-wide or depends on particular teams or managers."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether AI adoption and attitudes are monitored and the approach improved.",
+              "look_for": "Usage data of AI tools, employee surveys, tracking of proposed and piloted ideas, and actions taken on the results.",
+              "not_applicable_if": "There is no organization-wide approach to AI use."
+            }
+          ],
+          "levels": {
+            "0": "AI is not used or discussed in the organization. Employees have no access to or experience with AI tools, and openness to AI has not been recognized as something that needs attention.",
+            "1": "Individual employees try AI tools on their own initiative, often personal or free versions, without permission or guidance. Attitudes vary widely, many employees lack knowledge and confidence, and the organization does not actively encourage experimentation.",
+            "2": "Some teams or departments regularly use AI for specific purposes and encourage their members to experiment, while others remain sceptical or uninvolved. Openness to AI depends on individual managers or teams rather than on an organization-wide approach.",
+            "3": "The organization openly supports the use of AI through an organization-wide approach, such as guidelines on how employees may use AI tools. AI is part of regular workflows across departments, employees are invited to propose and take part in AI initiatives, and openness no longer depends on individual teams.",
+            "4": "AI adoption and attitudes are actively monitored, for example through usage data of AI tools, employee surveys, or tracking of proposed and piloted ideas. Low adoption or resistance in particular teams is identified and addressed.",
+            "5": "The culture of experimentation with AI is continuously strengthened based on monitoring and feedback. Employees routinely propose, test and share AI-supported ways of working, and lessons from both successes and failures are used systematically to improve how the organization works."
+          },
+          "examples": []
+        },
+        {
+          "name": "Talent",
+          "definition": "The extent to which the organization can access, develop, and retain the technical and domain-specific expertise required for AI, including specialized AI roles and internal individuals who can support wider adoption.",
+          "opening_question": "Who in your organization has the skills to develop or implement AI, and how are they involved in AI work?",
+          "criteria": [
+            {
+              "id": "expertise",
+              "description": "Whether the organization has access to AI-related expertise, internally or externally.",
+              "look_for": "Data scientists, engineers or other AI specialists, external partners or vendors, self-taught individuals, or nobody with relevant skills."
+            },
+            {
+              "id": "roles",
+              "description": "Whether AI responsibilities are part of defined roles.",
+              "look_for": "Defined AI roles, a central AI team or centre of excellence, designated AI champions in departments, or AI work done as an unofficial side task."
+            },
+            {
+              "id": "collaboration",
+              "description": "Whether AI work combines technical, business and domain expertise.",
+              "look_for": "Mixed teams of technical specialists, business people and domain experts, AI work done only by technical staff, and who initiates AI projects."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether AI skills and capacity are monitored and developed.",
+              "look_for": "Skills assessments, tracking of open roles and staff turnover, review of how AI teams perform, and actions to close gaps.",
+              "not_applicable_if": "AI roles are not defined across the organization."
+            }
+          ],
+          "levels": {
+            "0": "The organization has no AI-related expertise, internal or external, and the need for it has not been recognized.",
+            "1": "AI-related expertise exists only by chance, in individuals who acquired it on their own. It is not part of anyone's role, and whether AI work can be done depends on whoever happens to have the skills.",
+            "2": "Some teams have people with AI expertise, such as data scientists or engineers, or work with external specialists on specific projects. AI work is done mostly by technical staff with limited involvement of business or domain experts, and expertise is not shared across the organization.",
+            "3": "AI roles and responsibilities are defined across the organization, for example a central AI team or designated AI champions in departments, and expertise is obtained through a deliberate mix of hiring, internal development and external partners. AI initiatives are carried out by teams that combine technical, business and domain expertise.",
+            "4": "AI skills and capacity are actively monitored, for example through regular skills assessments, tracking of open roles and staff turnover, and review of how AI teams perform. Gaps in expertise are identified and addressed through hiring, development or partnerships.",
+            "5": "The organization continuously improves how it attracts, develops and retains AI talent, based on monitoring results and feedback. Career paths for AI roles are established, and internal experts systematically support wider adoption of AI across the organization."
+          },
+          "examples": []
+        },
+        {
+          "name": "Training",
+          "definition": "The extent to which employees are supported in developing the knowledge and skills required to work effectively with AI through structured learning, upskilling, and practical support in adopting AI-assisted ways of working.",
+          "opening_question": "How do employees in your organization learn to work with AI?",
+          "criteria": [
+            {
+              "id": "offering",
+              "description": "What learning opportunities about AI exist.",
+              "look_for": "No training, self-learning only, occasional workshops or talks, a structured programme, or certifications."
+            },
+            {
+              "id": "reach",
+              "description": "Who can access AI learning and whether it is organized across the organization.",
+              "look_for": "Individuals only, selected teams or roles, all employees, and whether someone is responsible for organizing it."
+            },
+            {
+              "id": "support",
+              "description": "Practical support and knowledge sharing for using AI in daily work.",
+              "look_for": "Guidelines or how-to material for AI tools, communities or channels for sharing experience, people employees can ask for help, or no support at all."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether AI training is monitored, evaluated and improved.",
+              "look_for": "Tracking of participation, assessment of skills before and after training, feedback from employees, and changes made as a result.",
+              "not_applicable_if": "There is no structured training across the organization."
+            }
+          ],
+          "levels": {
+            "0": "There is no AI training or learning support, and the need for it has not been recognized.",
+            "1": "Employees learn about AI on their own, without formal training, guidance or knowledge sharing. Whether someone learns depends entirely on individual initiative.",
+            "2": "Occasional training, workshops or peer knowledge sharing take place, usually within certain teams or for selected employees. They are not systematically organized or available across the organization.",
+            "3": "A structured AI training programme is available across the organization, covering the skills employees need for their roles, together with practical guidance on using AI tools in their work. Responsibility for the programme is assigned, and knowledge is shared through established channels.",
+            "4": "AI training is actively monitored and measured, for example through participation, assessment of skills before and after training, and tracking of AI tool use. Gaps in coverage or effectiveness are identified and corrected.",
+            "5": "The training programme is continuously improved based on monitoring results, employee feedback and changing AI capabilities. Learning is built into everyday work, for example through communities of practice and on-the-job support."
+          },
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "Strategy",
+      "definition": "The extent to which an organization has established a clear purpose for AI and aligned its AI initiatives with broader business objectives and organizational priorities.",
+      "report_levels": {
+        "0": "Overall, the organization has no strategic direction for AI, and the need for one has not yet been recognized.",
+        "1": "Overall, AI activities arise from individual initiative without a shared purpose or link to business goals, so direction is unpredictable and varies across the organization.",
+        "2": "Overall, some leaders or departments pursue their own AI goals and use cases, but there is no shared, documented direction for the whole organization.",
+        "3": "Overall, the organization has a documented AI direction with measurable business objectives, executive sponsorship and a defined process for choosing AI use cases.",
+        "4": "Overall, the AI direction, objectives and use cases are regularly reviewed against defined indicators, and deviations are identified and addressed.",
+        "5": "Overall, the AI direction, objectives and use case portfolio are continuously refined based on results, feedback and external developments."
+      },
+      "subdimensions": [
+        {
+          "name": "AI Ambition",
+          "definition": "The extent to which the organization has clearly defined what it intends to achieve through AI and the role AI is expected to play in its future development, whether primarily to optimize existing activities, strengthen its competitive position, or enable broader business transformation.",
+          "opening_question": "What does your organization want to achieve with AI, and how was that decided?",
+          "criteria": [
+            {
+              "id": "definition",
+              "description": "Whether the organization has defined what it wants to achieve with AI.",
+              "look_for": "A documented AI strategy or ambition, goals held only by some leaders or departments, individual ideas, or no view at all, including whether leadership sees the need for one."
+            },
+            {
+              "id": "direction",
+              "description": "How clear the intended role of AI is.",
+              "look_for": "Whether AI is meant to optimize existing activities, strengthen the competitive position, or transform the business, and whether this is stated clearly or only in general terms such as 'become AI-driven'."
+            },
+            {
+              "id": "scope",
+              "description": "Whether the ambition applies to and is known across the organization.",
+              "look_for": "Whether the ambition is shared and communicated across departments, owned by someone, or differs between parts of the organization."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether the ambition is reviewed and updated.",
+              "look_for": "Regular reviews of the AI strategy, for example yearly, updates based on results or new regulation, or a strategy not revisited since it was written.",
+              "not_applicable_if": "There is no documented organization-wide ambition."
+            }
+          ],
+          "levels": {
+            "0": "The organization has no view on what it wants to achieve with AI, and the need for one has not been recognized. Leadership shows no interest in defining a direction for AI.",
+            "1": "Ideas about what AI could do come from individuals, without a shared view of what the organization wants to achieve. Some leaders may see the need for direction, but nothing is defined, and expectations of AI vary from person to person.",
+            "2": "Some leaders or departments have their own goals for AI, such as automating processes in their area. There is no shared, documented ambition for the organization, and different parts of it expect different things from AI.",
+            "3": "A documented AI ambition or strategy exists for the whole organization. It states the role AI should play, for example optimizing existing activities, strengthening the competitive position or transforming the business, it is communicated across the organization, and its ownership is assigned.",
+            "4": "The AI ambition is reviewed regularly, for example at least once a year, against the progress of AI initiatives and changes such as new regulation. Deviations between the ambition and what is happening are identified and addressed.",
+            "5": "The AI ambition is continuously refined based on results, feedback and developments in AI and the market, and it actively shapes the organization's long-term direction."
+          },
+          "examples": []
+        },
+        {
+          "name": "Objectives and Alignment",
+          "definition": "The extent to which AI objectives are connected to broader business outcomes and organizational strategy rather than being defined solely through technological performance measures, including alignment among relevant stakeholders such as executive sponsorship and support across organizational departments.",
+          "opening_question": "How is AI connected to your organization's business goals, and who in leadership is involved?",
+          "criteria": [
+            {
+              "id": "business_link",
+              "description": "Whether AI objectives are tied to business outcomes.",
+              "look_for": "AI linked to specific business goals, only to operational efficiency, only to technical measures, or treated as a technical experiment with no link to business."
+            },
+            {
+              "id": "targets",
+              "description": "Whether AI objectives are concrete and measurable.",
+              "look_for": "Measurable targets such as 'reduce service costs by 20%', focus areas without targets, or objectives stated only in general terms."
+            },
+            {
+              "id": "sponsorship",
+              "description": "Whether leadership and departments support and align on AI.",
+              "look_for": "An executive sponsor, AI in strategic plans and budgets, support from some executives or teams only, consistent or inconsistent leadership involvement, and agreement between departments."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether progress toward AI objectives is reviewed.",
+              "look_for": "Regular reviews against KPIs by leadership, actions taken when targets are missed, and refinement of objectives over time.",
+              "not_applicable_if": "There are no organization-wide AI objectives."
+            }
+          ],
+          "levels": {
+            "0": "AI is not linked to any business objectives and, if considered at all, is seen as a purely technical topic. Leadership is not involved.",
+            "1": "AI is treated as a technical experiment or a way to save effort in individual cases. Objectives, if any, are set by individuals and are either general, such as 'become AI-driven', or purely technical, and leadership rarely links AI to business goals.",
+            "2": "Some executives or teams connect AI with business priorities in their own area and support AI initiatives there. Objectives name focus areas, such as improving customer experience, but have no measurable targets, and leadership involvement is not consistent across departments.",
+            "3": "AI objectives are defined for the organization as measurable business outcomes, such as 'reduce service costs by 20%', and are linked to the overall strategy. An executive sponsor is assigned, AI is part of strategic plans and budgets, and departments support the objectives.",
+            "4": "Leadership regularly reviews progress toward AI objectives against defined KPIs. Missed targets and differences between departments are identified and addressed.",
+            "5": "AI objectives and KPIs are continuously refined based on results and feedback, and AI is fully built into the organization's strategic planning and decision-making cycles."
+          },
+          "examples": []
+        },
+        {
+          "name": "Use Case Prioritization",
+          "definition": "The extent to which the organization systematically identifies and prioritizes AI use cases according to their expected business value, feasibility, scalability, and alignment with strategic objectives, rather than pursuing AI applications solely because they are technologically possible.",
+          "opening_question": "When an idea for using AI comes up in your organization, how is it decided whether to pursue it?",
+          "criteria": [
+            {
+              "id": "identification",
+              "description": "How potential AI use cases are identified.",
+              "look_for": "Ideas arising ad hoc from individuals or available tools, teams collecting their own ideas, or a systematic organization-wide search for where AI could bring value."
+            },
+            {
+              "id": "evaluation",
+              "description": "Whether use cases are assessed before investment.",
+              "look_for": "No assessment, informal judgement within teams, or defined criteria such as business value, feasibility, scalability and fit with strategy."
+            },
+            {
+              "id": "decision",
+              "description": "Who decides on and funds AI use cases.",
+              "look_for": "Individuals or teams deciding and funding on their own, informal coordination between teams, or a designated body or process for the whole organization."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether the results of use cases are tracked and the portfolio reviewed.",
+              "look_for": "Measuring results against expected value, regular review of the use case portfolio, stopping or adjusting use cases, and learning from past projects.",
+              "not_applicable_if": "There is no organization-wide prioritization process."
+            }
+          ],
+          "levels": {
+            "0": "No AI use cases have been identified or pursued, and the organization has not considered where AI could bring value.",
+            "1": "AI use cases arise ad hoc from individual interest, immediate needs or available tools, without any assessment of value or feasibility. Most AI work consists of isolated experiments.",
+            "2": "Teams or departments identify and fund their own AI use cases, sometimes with a basic assessment of benefits, using informal criteria that differ between teams. Potential applications may be listed, but they are not formally evaluated or compared across the organization.",
+            "3": "AI use cases are identified and evaluated through a documented, organization-wide process using defined criteria such as business value, feasibility, scalability and alignment with strategic objectives. A designated body or role decides which use cases receive investment.",
+            "4": "The results of implemented use cases are measured against their expected value, and the use case portfolio is reviewed regularly. Use cases that underperform are adjusted or stopped.",
+            "5": "The prioritization process is continuously improved based on results from past use cases and feedback, and new opportunities for AI are identified systematically across the organization."
           },
           "examples": []
         }

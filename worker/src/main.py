@@ -37,6 +37,13 @@ def database(request: Request):
     return request.scope["env"].DB
 
 
+def test_mode(request: Request) -> bool:
+    """TEST_MODE is "0" in wrangler.jsonc (live site) and can be set to "1"
+    locally in .dev.vars. Only in test mode does the API return the check
+    details, so respondents never receive them."""
+    return getattr(request.scope["env"], "TEST_MODE", "0") == "1"
+
+
 class AnswerRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 
@@ -84,7 +91,7 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
         "message": message,
         "done": done,
         "position": state["subdimension_index"],
-        "check": flow.check_summary(RUBRIC, state),
+        "check": flow.check_summary(RUBRIC, state) if test_mode(request) else None,
     }
 
 

@@ -295,12 +295,14 @@
       </div>
       <div class="cp-grid">
         <div class="cp-box cp-covered"><span class="mono">CRITERIA COVERED</span><span data-field="covered"></span></div>
-        <div class="cp-box cp-open"><span class="mono">FOLLOW-UP CRITERION</span><span data-field="followUpCriterion"></span></div>
+        <div class="cp-box cp-open"><span class="mono">FOLLOW-UP CRITERIA</span><span data-field="followUpCriteria"></span></div>
       </div>
-      <span class="cp-note">Answer the follow-up question above to continue.</span>`;
-    box.querySelector('.cp-title span').textContent = 'Check · ' + check.subdimension;
+      <span class="cp-note">Test mode only (TEST_MODE=1). Respondents never see this box.</span>`;
+    box.querySelector('.cp-title span').textContent =
+      'Check · ' + check.subdimension + ' · ' + check.message_type + ' → ' + check.action;
     box.querySelector('[data-field="covered"]').textContent = `${check.covered} of ${check.total}`;
-    box.querySelector('[data-field="followUpCriterion"]').textContent = check.follow_up_criterion;
+    box.querySelector('[data-field="followUpCriteria"]').textContent =
+      check.follow_up_criteria.length ? check.follow_up_criteria.join(' / ') : '—';
     msg.querySelector('.stack').appendChild(box);
     scrollDown();
   }
@@ -354,7 +356,7 @@
   async function answer(text) {
     text = text.trim();
     if (!text || !conversationId) return;
-    // The check box belongs to the open follow-up; once answered it is removed.
+    // The check box (test mode only) belongs to the last chatbot message; once answered it is removed.
     document.querySelectorAll('.check-box').forEach(box => box.remove());
     userMsg(text);
     ta.value = '';

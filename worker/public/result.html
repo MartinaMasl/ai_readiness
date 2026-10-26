@@ -2268,7 +2268,7 @@ body[data-not-sent] > #vis-container ~ #not-sent {
         <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
       </marker>
     </defs>
-  </svg><div id="vis-container"><h2 class="sr-only">AI readiness assessment result: a radar chart of the dimension scores, the overall readiness score, and a card per dimension with its score, level, the meaning of that level and the main gap.</h2>
+  </svg><div id="vis-container"><h2 class="sr-only">AI readiness assessment result: a radar chart of the dimension scores, the overall readiness score, and a card per dimension with its score, level and the meaning of that level.</h2>
 <div id="reportError" hidden style="font-size:14px;color:var(--text-secondary);padding:1rem 0;"></div>
 <div id="report" hidden>
 <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:center;padding:0.5rem 0 1rem;">
@@ -2294,7 +2294,6 @@ body[data-not-sent] > #vis-container ~ #not-sent {
     </div>
     <div data-field="level" style="font-size:13px;color:var(--text-secondary);margin-top:2px;"></div>
     <div data-field="reportText" style="font-size:13px;color:var(--text-secondary);margin-top:10px;line-height:1.5;"></div>
-    <div data-field="gap" style="font-size:13px;color:var(--text-secondary);margin-top:10px;line-height:1.5;border-top:0.5px solid var(--border);padding-top:10px;"><span style="color:var(--text-primary);font-weight:500;">Main gap: <span data-field="gapName"></span>.</span> <span data-field="gapText"></span></div>
   </div>
 </template>
 
@@ -2314,12 +2313,6 @@ function showDimension(dimension) {
   field('score').textContent = dimension.score_display;
   field('level').textContent = levelText(dimension.level);
   field('reportText').textContent = dimension.report_text;
-  if (dimension.gap) {
-    field('gapName').textContent = dimension.gap.subdimension;
-    field('gapText').textContent = dimension.gap.text;
-  } else {
-    field('gap').hidden = true;
-  }
   document.getElementById('dimensionCards').appendChild(card);
 }
 

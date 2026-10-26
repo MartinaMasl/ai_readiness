@@ -45,16 +45,3 @@ def test_floor_is_exact_for_whole_number_means():
     # 10/3 + 8/3 + 3 + 3 = 12, mean 3: stays level 3, not 2.
     dims = [Fraction(10, 3), Fraction(8, 3), Fraction(3), Fraction(3)]
     assert scoring.maturity_level(scoring.overall_score(dims)) == 3
-
-
-def test_main_gap_is_lowest():
-    assert scoring.main_gap([4, 2, 5]) == 1
-
-
-def test_main_gap_tie_takes_first_listed():
-    assert scoring.main_gap([3, 1, 1]) == 1
-    assert scoring.main_gap([2, 2, 2]) == 0
-
-
-def test_no_gap_at_level_5():
-    assert scoring.main_gap([5, 5, 5]) is None

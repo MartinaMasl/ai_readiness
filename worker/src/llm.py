@@ -23,22 +23,27 @@ class StrictModel(BaseModel):
 
 # --- What the model returns -------------------------------------------------
 
+MessageType = Literal["answer", "partly_relevant", "question", "dont_know", "off_topic"]
+Status = Literal["evidence", "not_applicable", "dont_know", "missing"]
+
+
 class CriterionCheck(StrictModel):
     criterion: str  # criterion id from the rubric
-    covered: bool
-    quote: str | None
+    status: Status
+    quote: str | None  # only for "evidence"
 
 
 class CheckResult(StrictModel):
-    message_type: Literal["answer", "clarification_request"]
+    message_type: MessageType
     criteria: list[CriterionCheck]
-    follow_up: str | None
-    targets: str | None
+    follow_up_needed: bool
+    targets: list[str]  # up to two missing criteria the follow-up asks about
+    reply: str | None
 
 
 class CriterionEvidence(StrictModel):
     criterion: str  # criterion id from the rubric
-    evidence: str  # a quote, or "no evidence"
+    evidence: str  # a quote, "not applicable: <condition>" or "no evidence"
 
 
 class ScoreResult(StrictModel):
@@ -71,9 +76,16 @@ def fill(template: str, values: dict[str, str]) -> str:
 
 
 def format_criteria(sub: Subdimension) -> str:
-    return "\n".join(
-        f"- {c.id}: {c.description}\n  Look for: {c.look_for}" for c in sub.criteria
-    )
+    lines = []
+    for c in sub.criteria:
+        lines.append(f"- {c.id}: {c.description}\n  Look for: {c.look_for}")
+        if c.not_applicable_if:
+            lines.append(f"  Not applicable if: {c.not_applicable_if}")
+    return "\n".join(lines)
+
+
+def format_rules(rules: list[str]) -> str:
+    return "\n".join(f"- {rule}" for rule in rules)
 
 
 def format_levels(sub: Subdimension) -> str:
@@ -91,7 +103,8 @@ def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: lis
         "name": sub.name,
         "definition": sub.definition,
         "criteria": format_criteria(sub),
-        "plans_rule": rubric.rules.plans,
+        "levels": format_levels(sub),
+        "rules": format_rules([rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans]),
         "transcript": format_transcript(messages),
     })
 
@@ -103,10 +116,10 @@ def score_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: lis
         "definition": sub.definition,
         "criteria": format_criteria(sub),
         "levels": format_levels(sub),
-        "rules": "\n".join(
-            f"- {rule}"
-            for rule in [rules.score_values, rules.mixed_evidence, rules.plans, rules.insufficient_evidence]
-        ),
+        "rules": format_rules([
+            rules.score_values, rules.mixed_evidence, rules.plans,
+            rules.insufficient_evidence, rules.not_applicable,
+        ]),
         "transcript": format_transcript(messages),
     })
 
@@ -139,26 +152,43 @@ def _check_criterion_ids(sub: Subdimension, ids: list[str]) -> None:
 
 
 def check_to_log(result: CheckResult, sub: Subdimension) -> dict:
-    """The check as it is stored in the state and the log. all_covered is
-    worked out here, not by the model."""
+    """The check as it is stored in the state and the log, after checking
+    that the model's answer is consistent."""
     _check_criterion_ids(sub, [c.criterion for c in result.criteria])
-    all_covered = all(c.covered for c in result.criteria)
-    needs_follow_up = result.message_type == "clarification_request" or not all_covered
-    if needs_follow_up and not result.follow_up:
-        raise ValueError("A follow-up is needed but the model did not write one")
-    if result.targets is not None and result.targets not in [c.id for c in sub.criteria]:
-        raise ValueError(f"Unknown criterion in targets: {result.targets}")
+    status = {c.criterion: c.status for c in result.criteria}
+    for c in result.criteria:
+        if c.status == "evidence" and not c.quote:
+            raise ValueError(f"{c.criterion}: status evidence without a quote")
+    has_condition = {c.id for c in sub.criteria if c.not_applicable_if}
+    for criterion, value in status.items():
+        if value == "not_applicable" and criterion not in has_condition:
+            raise ValueError(f"{criterion}: not_applicable, but the rubric gives no condition for it")
+    if result.follow_up_needed:
+        if not 1 <= len(result.targets) <= 2:
+            raise ValueError(f"A follow-up must target one or two criteria, got {result.targets}")
+        for target in result.targets:
+            if status.get(target) != "missing":
+                raise ValueError(f"Follow-up target {target} is not a missing criterion")
+    elif result.targets:
+        raise ValueError("Targets given although no follow-up is needed")
+    needs_reply = result.message_type in ("question", "off_topic") or result.follow_up_needed
+    if needs_reply and not result.reply:
+        raise ValueError("A reply is needed but the model did not write one")
     return {
         "message_type": result.message_type,
-        "criteria": {c.criterion: {"covered": c.covered, "quote": c.quote} for c in result.criteria},
-        "all_covered": all_covered,
-        "follow_up": result.follow_up if needs_follow_up else None,
-        "targets": result.targets if needs_follow_up else None,
+        "criteria": {c.criterion: {"status": c.status, "quote": c.quote} for c in result.criteria},
+        "follow_up_needed": result.follow_up_needed,
+        "targets": list(result.targets),
+        "reply": result.reply if needs_reply else None,
     }
 
 
 def score_to_log(result: ScoreResult, sub: Subdimension) -> dict:
     _check_criterion_ids(sub, [e.criterion for e in result.evidence])
+    has_condition = {c.id for c in sub.criteria if c.not_applicable_if}
+    for e in result.evidence:
+        if e.evidence.startswith("not applicable") and e.criterion not in has_condition:
+            raise ValueError(f"{e.criterion}: not applicable, but the rubric gives no condition for it")
     return {
         "level": result.level,
         "evidence": {e.criterion: e.evidence for e in result.evidence},

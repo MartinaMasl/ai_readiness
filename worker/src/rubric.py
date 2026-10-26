@@ -12,8 +12,6 @@ from pydantic import BaseModel, field_validator
 RUBRIC_PATH = Path(__file__).parent / "rubric.json"
 
 LEVELS = [0, 1, 2, 3, 4, 5]
-# Level 5 has no next level, so there is no gap sentence for it.
-GAP_LEVELS = [0, 1, 2, 3, 4]
 
 
 def _check_all_levels(value: dict) -> dict:
@@ -23,19 +21,17 @@ def _check_all_levels(value: dict) -> dict:
     return value
 
 
-def _check_gap_levels(value: dict) -> dict:
-    """The gap sentences must cover exactly the levels 0 to 4."""
-    if sorted(value) != GAP_LEVELS:
-        raise ValueError(f"gap must be exactly {GAP_LEVELS}, got {sorted(value)}")
-    return value
-
-
 class Rules(BaseModel):
     score_values: str
-    max_follow_ups: int
+    max_follow_ups: int  # per subdimension
+    max_follow_ups_total: int  # for the whole conversation
+    max_redirects: int  # off-topic messages steered back, per subdimension
+    max_clarifications: int  # respondent questions answered, per subdimension
+    follow_up_purpose: str
     mixed_evidence: str
     plans: str
     insufficient_evidence: str
+    not_applicable: str
 
 
 class ScaleLevel(BaseModel):
@@ -47,6 +43,8 @@ class Criterion(BaseModel):
     id: str
     description: str
     look_for: str
+    # When this condition is met, the criterion is not applicable (see rules.not_applicable).
+    not_applicable_if: str | None = None
 
 
 class Subdimension(BaseModel):
@@ -55,13 +53,9 @@ class Subdimension(BaseModel):
     opening_question: str
     criteria: list[Criterion]
     levels: dict[int, str]
-    # One sentence per level for the report: the current state and what the
-    # next level requires.
-    gap: dict[int, str]
     examples: list = []
 
     _levels_complete = field_validator("levels")(_check_all_levels)
-    _gap_complete = field_validator("gap")(_check_gap_levels)
 
 
 class Dimension(BaseModel):

@@ -52,6 +52,7 @@ def test_score_prompt_contains_rubric_levels_and_rules():
     for text in SUBS[0].levels.values():
         assert text in prompt
     assert RUBRIC.rules.mixed_evidence in prompt and RUBRIC.rules.insufficient_evidence in prompt
+    assert RUBRIC.rules.not_applicable in prompt
 
 
 def test_fill_refuses_a_missing_value():
@@ -59,38 +60,84 @@ def test_fill_refuses_a_missing_value():
         llm.fill("{{name}} and {{other}}", {"name": "x"})
 
 
-def test_check_to_log_works_out_all_covered():
-    sub = SUBS[0]
-    result = llm.CheckResult(
-        message_type="answer",
-        criteria=[llm.CriterionCheck(criterion=c.id, covered=i == 0, quote="q" if i == 0 else None)
-                  for i, c in enumerate(sub.criteria)],
-        follow_up="A follow-up?",
-        targets=sub.criteria[1].id,
-    )
-    entry = llm.check_to_log(result, sub)
-    assert entry["all_covered"] is False
-    assert entry["criteria"][sub.criteria[0].id] == {"covered": True, "quote": "q"}
-    assert entry["targets"] == sub.criteria[1].id
+def make_check(sub, statuses, **fields):
+    """A CheckResult with the given status per criterion (in rubric order)."""
+    criteria = [
+        llm.CriterionCheck(criterion=c.id, status=status, quote="q" if status == "evidence" else None)
+        for c, status in zip(sub.criteria, statuses)
+    ]
+    values = {"message_type": "answer", "follow_up_needed": False, "targets": [], "reply": None}
+    values.update(fields)
+    return llm.CheckResult(criteria=criteria, **values)
 
 
-def test_check_to_log_refuses_wrong_criteria_and_missing_follow_up():
-    sub = SUBS[0]
+SUB = SUBS[0]  # Discoverability: monitoring has a not_applicable_if condition
+
+
+def test_check_to_log_has_the_log_shape():
+    check = make_check(SUB, ["evidence", "missing", "dont_know", "not_applicable"],
+                       follow_up_needed=True, targets=[SUB.criteria[1].id], reply="A follow-up?")
+    entry = llm.check_to_log(check, SUB)
+    assert entry["criteria"][SUB.criteria[0].id] == {"status": "evidence", "quote": "q"}
+    assert entry["criteria"][SUB.criteria[3].id] == {"status": "not_applicable", "quote": None}
+    assert entry["targets"] == [SUB.criteria[1].id] and entry["reply"] == "A follow-up?"
+
+
+def test_follow_up_may_target_only_missing_criteria():
+    for status in ["dont_know", "not_applicable", "evidence"]:
+        check = make_check(SUB, ["missing", "missing", "missing", status],
+                           follow_up_needed=True, targets=[SUB.criteria[3].id], reply="?")
+        with pytest.raises(ValueError):
+            llm.check_to_log(check, SUB)
+
+
+def test_follow_up_targets_one_or_two_criteria():
+    three = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
+                       targets=[c.id for c in SUB.criteria[:3]], reply="?")
+    with pytest.raises(ValueError):
+        llm.check_to_log(three, SUB)
+    two = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
+                     targets=[c.id for c in SUB.criteria[:2]], reply="?")
+    assert len(llm.check_to_log(two, SUB)["targets"]) == 2
+
+
+def test_not_applicable_only_where_the_rubric_has_a_condition():
+    check = make_check(SUB, ["not_applicable", "evidence", "evidence", "evidence"])
+    with pytest.raises(ValueError):
+        llm.check_to_log(check, SUB)
+
+
+def test_question_and_off_topic_need_a_reply():
+    for message_type in ["question", "off_topic"]:
+        with pytest.raises(ValueError):
+            llm.check_to_log(make_check(SUB, ["missing"] * 4, message_type=message_type), SUB)
+
+
+def test_check_to_log_refuses_wrong_criteria_and_evidence_without_quote():
     wrong_ids = llm.CheckResult(
         message_type="answer",
-        criteria=[llm.CriterionCheck(criterion="made_up", covered=True, quote="q")],
-        follow_up=None, targets=None,
+        criteria=[llm.CriterionCheck(criterion="made_up", status="evidence", quote="q")],
+        follow_up_needed=False, targets=[], reply=None,
     )
     with pytest.raises(ValueError):
-        llm.check_to_log(wrong_ids, sub)
+        llm.check_to_log(wrong_ids, SUB)
+    no_quote = make_check(SUB, ["evidence"] * 3 + ["not_applicable"])
+    no_quote.criteria[0].quote = None
+    with pytest.raises(ValueError):
+        llm.check_to_log(no_quote, SUB)
 
-    clarification_without_reply = llm.CheckResult(
-        message_type="clarification_request",
-        criteria=[llm.CriterionCheck(criterion=c.id, covered=True, quote="q") for c in sub.criteria],
-        follow_up=None, targets=None,
-    )
-    with pytest.raises(ValueError):
-        llm.check_to_log(clarification_without_reply, sub)
+
+def test_criteria_text_contains_not_applicable_condition():
+    text = llm.format_criteria(SUB)
+    assert f"Not applicable if: {SUB.criteria[3].not_applicable_if}" in text
+
+
+def test_check_prompt_contains_levels_and_follow_up_rules():
+    _, template = llm.parse_prompt_file((PROMPTS / "check.md").read_text())
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES)
+    for text in SUB.levels.values():
+        assert text in prompt
+    assert RUBRIC.rules.follow_up_purpose in prompt and RUBRIC.rules.not_applicable in prompt
 
 
 def test_score_to_log_has_the_log_shape():
@@ -102,6 +149,16 @@ def test_score_to_log_has_the_log_shape():
     entry = llm.score_to_log(result, sub)
     assert list(entry) == ["level", "evidence", "reason", "why_not_higher", "flags"]
     assert entry["evidence"] == {c.id: "no evidence" for c in sub.criteria}
+
+
+def test_score_not_applicable_only_where_the_rubric_has_a_condition():
+    evidence = [llm.CriterionEvidence(criterion=c.id, evidence="no evidence") for c in SUB.criteria]
+    evidence[3].evidence = f"not applicable: {SUB.criteria[3].not_applicable_if}"
+    ok = llm.ScoreResult(evidence=evidence, level=1, reason="r", why_not_higher="w", flags=[])
+    assert llm.score_to_log(ok, SUB)["evidence"][SUB.criteria[3].id].startswith("not applicable")
+    evidence[0].evidence = "not applicable: something"
+    with pytest.raises(ValueError):
+        llm.score_to_log(ok, SUB)
 
 
 class FakeClient:
