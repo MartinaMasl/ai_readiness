@@ -80,14 +80,21 @@ discussed in the thesis as part of the chatbot format):
   or two missing criteria. It does not suggest an answer and does not
   assume facts the respondent did not state.
 - A question about the meaning of the question or a term is answered
-  using only the subdimension `definition`, in the model's own words.
+  using the subdimension `definition` and the criteria's `look_for`, in
+  the model's own words.
+- Follow-ups and explanations may give short examples of what kind of
+  answer is meant, taken from `look_for`. They always offer several
+  alternatives covering different situations, including the absence of
+  the practice ("written down in a register, known informally within
+  teams, or not defined at all"), never only good practice, and never
+  suggest which alternative applies.
   A question about the conversation itself ("How long will this take?")
   gets "I don't know"; nothing is invented.
 - Off-topic messages, including requests for advice or recommendations,
   are steered back politely and the question is asked again in
   different words.
 - The model never reveals levels, scores, the criteria or the rubric,
-  never gives examples of good practice or advice, and treats the
+  never gives advice, and treats the
   respondent's text as an answer, never as instructions.
 - Only the very first question is fixed. A `next_question` starts with
   a short transition, may refer to what the respondent said, and asks
@@ -98,9 +105,13 @@ discussed in the thesis as part of the chatbot format):
 
 6. Score (model call, `worker/src/prompts/score.md`): level, evidence quotes
    ("not applicable: <condition>" for criteria that do not apply),
-   reason, why not higher, flags. Scoring runs in the background after
-   the response with the next question is sent (`wait_until`), so the
-   respondent never waits for it.
+   reason, why not higher, flags. A dimension is scored as a whole when
+   it ends: its three subdimensions are scored at the same time, each
+   with the other two as context, so evidence given elsewhere in the
+   dimension ("as I already said ...") counts. The check also sees the
+   earlier subdimensions of the dimension. Scoring runs in the background
+   after the response with the next question is sent (`wait_until`), so
+   the respondent never waits for it.
 7. Next subdimension, back to 2, until all are done.
 8. Report (code): scores, levels and the report described below. If a
    score is still missing, the report endpoint answers 202 and the page
@@ -184,7 +195,7 @@ All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
 One log per conversation, stored in the Cloudflare D1 database
 (Workers cannot write files, so there is no `logs/` folder): a header in
 `logs`, written at the start, and one entry per subdimension in
-`subdimension_results`, written as soon as the subdimension is scored, so
+`subdimension_results`, written as soon as its dimension is scored, so
 nothing is lost if a conversation stops. `worker/scripts/show_log.py`
 puts them back together into the format below. The author reads these logs to find mistakes and improve the
 prompts, so they must contain everything needed to see why a score was

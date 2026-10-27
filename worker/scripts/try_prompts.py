@@ -136,10 +136,10 @@ async def main() -> None:
         print("\n--- check")
         position = in_order.index(sub)
         next_sub = in_order[position + 1] if position + 1 < len(in_order) else None
-        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, next_sub),
+        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, next_sub, []),
                   llm.CheckResult, sub, lambda result, sub: llm.check_to_log(result, sub, next_sub))
         print("\n--- score")
-        await run(client, settings, llm.score_prompt(score_template, rubric, sub, messages), llm.ScoreResult, sub, llm.score_to_log)
+        await run(client, settings, llm.score_prompt(score_template, rubric, sub, messages, []), llm.ScoreResult, sub, llm.score_to_log)
 
 
 if __name__ == "__main__":

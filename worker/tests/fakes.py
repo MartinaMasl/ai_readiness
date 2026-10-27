@@ -27,7 +27,11 @@ class FakeModel:
     def info(self) -> dict:
         return {"model": {"id": "fake", "settings": {}}, "prompt_versions": {"check": None, "score": None}}
 
-    async def check(self, rubric, sub, messages, next_sub) -> dict:
+    def __init__(self):
+        self.contexts = []  # (call, subdimension, names of the context subdimensions), for the tests
+
+    async def check(self, rubric, sub, messages, next_sub, context) -> dict:
+        self.contexts.append(("check", sub.name, [part["subdimension"] for part in context]))
         answer = messages[-1]["text"]
         earlier = [m["text"] for m in messages[:-1] if m["role"] == "respondent"]
 
@@ -62,7 +66,8 @@ class FakeModel:
             )
         return result("answer", lambda c: "not_applicable" if c.not_applicable_if else "evidence")
 
-    async def score(self, rubric, sub, messages) -> dict:
+    async def score(self, rubric, sub, messages, context) -> dict:
+        self.contexts.append(("score", sub.name, [part["subdimension"] for part in context]))
         dimension = next(d for d in rubric.dimensions if sub in d.subdimensions)
         return {
             "level": FAKE_SCORES[dimension.subdimensions.index(sub) % len(FAKE_SCORES)],

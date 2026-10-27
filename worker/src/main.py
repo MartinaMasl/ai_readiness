@@ -16,6 +16,7 @@ Settings (wrangler.jsonc "vars", overridden locally by .dev.vars):
 MODEL_ID, TEMPERATURE, TEST_MODE, DIMENSIONS. Secret: OPENAI_API_KEY.
 """
 
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -112,22 +113,33 @@ async def start_conversation(request: Request):
     }
 
 
-async def score_and_save(env, conversation_id: str, rubric, finished: dict) -> None:
+async def score_and_save(env, conversation_id: str, rubric, finished: dict, dimension_records: list[dict]) -> None:
     """Score a finished subdimension and save its result (level and log entry)."""
-    entry = await flow.score_subdimension(rubric, finished, model(env))
+    entry = await flow.score_subdimension(rubric, finished, model(env), dimension_records)
     await storage.save_result(env.DB, conversation_id, finished, entry)
 
 
-async def score_in_background(env, conversation_id: str, rubric, finished: dict) -> None:
+async def score_in_background(env, conversation_id: str, rubric, finished: dict, dimension_records: list[dict]) -> None:
     """Runs after the response is sent. One retry; if both attempts fail,
     the report scores the subdimension later (see report())."""
     for attempt in (1, 2):
         try:
-            await score_and_save(env, conversation_id, rubric, finished)
+            started = datetime.now()
+            await score_and_save(env, conversation_id, rubric, finished, dimension_records)
+            seconds = (datetime.now() - started).total_seconds()
+            print(f"Background score saved for {finished['subdimension']} in {seconds:.1f}s")
             return
         except Exception as error:
             print(f"Background score failed ({attempt}/2) for {conversation_id}, "
                   f"{finished['subdimension']}: {type(error).__name__}: {error}")
+
+
+async def score_dimension_in_background(env, conversation_id: str, rubric, to_score: list[dict]) -> None:
+    """Score the subdimensions of an ended dimension at the same time, each
+    with the others as context."""
+    await asyncio.gather(*[
+        score_in_background(env, conversation_id, rubric, finished, to_score) for finished in to_score
+    ])
 
 
 @api.post("/conversations/{conversation_id}/answer")
@@ -145,19 +157,20 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
 
     rubric = conversation_rubric(state)
     try:
-        message, done, finished = await flow.handle_answer(rubric, state, body.text.strip(), model(env))
+        message, done, to_score = await flow.handle_answer(rubric, state, body.text.strip(), model(env))
     except (APIError, ValueError) as error:
         # The model call failed or its answer did not pass the checks in
         # llm.py. Nothing is saved, so the respondent can send the answer again.
         print(f"Model step failed for {conversation_id}: {type(error).__name__}: {error}")
         raise HTTPException(status_code=502, detail="The chatbot could not process the answer. Please try again.")
 
-    if finished:
-        finished["finished_at"] = storage.now()
+    for finished in to_score:
+        finished["finished_at"] = storage.now()  # when scoring started (see report())
     await storage.save_state(db, conversation_id, state)
-    if finished:
-        # Score after the response is sent; the Worker keeps running until it is done.
-        wait_until(score_in_background(env, conversation_id, rubric, finished))
+    if to_score:
+        # A dimension has ended: score its subdimensions together, after the
+        # response is sent; the Worker keeps running until they are done.
+        wait_until(score_dimension_in_background(env, conversation_id, rubric, to_score))
     return {
         "message": message,
         "done": done,
@@ -195,7 +208,8 @@ async def report(conversation_id: str, request: Request):
             return JSONResponse(status_code=202, content={"status": "scoring"})
         # The background score failed: score what is missing now.
         for finished in missing:
-            await score_and_save(env, conversation_id, rubric, finished)
+            dimension_records = [f for f in state["finished"] if f["dimension"] == finished["dimension"]]
+            await score_and_save(env, conversation_id, rubric, finished, dimension_records)
         levels = await storage.load_levels(db, conversation_id)
     return build_report(rubric, levels)
 

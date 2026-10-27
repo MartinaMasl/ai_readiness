@@ -25,8 +25,15 @@ The state is a plain dict so it can be saved to D1 as JSON:
                         to score it (see handle_answer)
     done                True when the last subdimension is finished
 
-Scoring is not part of handle_answer: when a subdimension is finished,
-handle_answer returns it, and main.py scores it in the background with
+Context: the check and the score also get the other subdimensions of the
+same dimension, so evidence the respondent gave earlier in the dimension
+("as I already said ...") counts. The check sees the earlier ones; the
+score sees all of them, because a dimension is scored as a whole when it
+ends.
+
+Scoring is not part of handle_answer: when the last subdimension of a
+dimension is finished, handle_answer returns the dimension's finished
+subdimensions, and main.py scores them in the background with
 score_subdimension while the respondent reads the next question.
 """
 
@@ -124,6 +131,13 @@ def next_action(rules: Rules, state: dict, check: dict) -> str:
     return "score"
 
 
+def earlier_in_dimension(rubric: Rubric, state: dict, dimension_name: str, sub: Subdimension) -> list[dict]:
+    """The transcripts of the subdimensions before sub in the same dimension."""
+    dimension = next(d for d in rubric.dimensions if d.name == dimension_name)
+    earlier = dimension.subdimensions[: dimension.subdimensions.index(sub)]
+    return [{"subdimension": s.name, "messages": messages_of(state, s)} for s in earlier]
+
+
 def messages_of(state: dict, sub: Subdimension) -> list[dict]:
     """The transcript of one subdimension, as the prompts get it."""
     return [
@@ -133,11 +147,12 @@ def messages_of(state: dict, sub: Subdimension) -> list[dict]:
     ]
 
 
-async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tuple[str, bool, dict | None]:
+async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tuple[str, bool, list[dict]]:
     """Run one step of the flow. Changes the state in place.
 
-    Returns (chatbot message, done, finished): finished is the subdimension
-    that has just ended, to be scored with score_subdimension, or None.
+    Returns (chatbot message, done, to_score): to_score is the finished
+    subdimensions of a dimension that has just ended, to be scored with
+    score_subdimension; otherwise an empty list.
     """
     subdimensions = all_subdimensions(rubric)
     dimension_name, sub = subdimensions[state["subdimension_index"]]
@@ -146,7 +161,8 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
     # Check the message, then let the code decide what happens next.
     is_last = state["subdimension_index"] + 1 == len(subdimensions)
     next_sub = None if is_last else subdimensions[state["subdimension_index"] + 1][1]
-    check = await model.check(rubric, sub, messages_of(state, sub), next_sub)
+    context = earlier_in_dimension(rubric, state, dimension_name, sub)
+    check = await model.check(rubric, sub, messages_of(state, sub), next_sub, context)
     action = next_action(rubric.rules, state, check)
     check["action"] = action  # recorded in the log: what the code did with this check
     state["checks"].append(check)
@@ -160,10 +176,10 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
             state["follow_ups"] += 1
             state["follow_ups_dimension"] += 1
         state["transcript"].append({"subdimension": sub.name, "role": "chatbot", "text": check["reply"]})
-        return check["reply"], False, None
+        return check["reply"], False, []
 
     # The subdimension is finished. Keep what is needed to score it; the
-    # score itself is done afterwards (score_subdimension).
+    # score itself is done when the dimension ends (score_subdimension).
     finished = {
         "position": state["subdimension_index"],
         "dimension": dimension_name,
@@ -181,6 +197,8 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
         },
     }
     state["finished"].append(finished)
+    dimension_ended = is_last or subdimensions[state["subdimension_index"] + 1][0] != dimension_name
+    to_score = [f for f in state["finished"] if f["dimension"] == dimension_name] if dimension_ended else []
 
     # Next subdimension, or finish.
     state["subdimension_index"] += 1
@@ -191,24 +209,31 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
     if state["subdimension_index"] == len(subdimensions):
         state["done"] = True
         state["transcript"].append({"subdimension": None, "role": "chatbot", "text": CLOSING})
-        return CLOSING, True, finished
+        return CLOSING, True, to_score
 
     next_dimension_name, next_sub = subdimensions[state["subdimension_index"]]
     if next_dimension_name != dimension_name:
         state["follow_ups_dimension"] = 0  # a new dimension has its own follow-up budget
     question = check["next_question"]  # written by the model in the check
     state["transcript"].append({"subdimension": next_sub.name, "role": "chatbot", "text": question})
-    return question, False, finished
+    return question, False, to_score
 
 
-async def score_subdimension(rubric: Rubric, finished: dict, model) -> dict:
-    """Score a finished subdimension. Returns its log entry; the level is
-    entry["score"]["level"]."""
+async def score_subdimension(rubric: Rubric, finished: dict, model, dimension_records: list[dict]) -> dict:
+    """Score a finished subdimension, with the other finished subdimensions
+    of its dimension (dimension_records) as context. Returns its log entry;
+    the level is entry["score"]["level"]."""
     sub = next(s for _, s in all_subdimensions(rubric) if s.name == finished["subdimension"])
-    score = await model.score(rubric, sub, finished["transcript"])
+    context = [
+        {"subdimension": r["subdimension"], "messages": r["transcript"]}
+        for r in dimension_records
+        if r["subdimension"] != finished["subdimension"]
+    ]
+    score = await model.score(rubric, sub, finished["transcript"], context)
     return {
         "subdimension": finished["subdimension"],
         "core_question": finished["core_question"],
+        "context": [part["subdimension"] for part in context],
         "transcript": finished["transcript"],
         "checks": finished["checks"],
         "counters": finished["counters"],

@@ -1,5 +1,5 @@
 {
-  "version": "0.7",
+  "version": "0.8",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
@@ -7,7 +7,7 @@
     "max_redirects": 2,
     "max_clarifications": 3,
     "follow_up_purpose": "Ask a follow-up only if the missing information could change the level. One follow-up may ask about up to two missing criteria.",
-    "mixed_evidence": "Choose the level that fits best overall. If the evidence sits between two levels, choose the lower one.",
+    "mixed_evidence": "Choose the level whose description fits the evidence best as a whole. A level fits when the evidence supports its main characteristics and does not contradict it. Do not rule out a level only because the respondent did not mention one of its details: what was not mentioned is unknown, not absent. A level does not fit when the evidence contradicts its description. If the evidence fits two levels equally well, choose the lower one.",
     "plans": "Score the current state. Plans and intentions do not count.",
     "insufficient_evidence": "Set the flag 'insufficient_evidence' when at least one criterion has no evidence, for example because the respondent did not know or the follow-up limit was reached. A criterion that is not applicable does not count as missing evidence. If some criteria have evidence, score on that evidence. If no criterion has evidence, the score is 0.",
     "not_applicable": "A criterion is not applicable when the condition in its 'not_applicable_if' is met. Do not ask about it, and do not treat it as missing evidence."

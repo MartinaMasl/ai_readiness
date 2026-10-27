@@ -40,14 +40,14 @@ def test_prompt_files_have_a_version_and_fill_completely(name):
     assert version
     build = llm.check_prompt if name == "check" else llm.score_prompt
     for sub in SUBS:
-        args = (template, RUBRIC, sub, MESSAGES) + ((None,) if name == "check" else ())
+        args = (template, RUBRIC, sub, MESSAGES) + ((None, []) if name == "check" else ([],))
         prompt = build(*args)  # raises if a placeholder is left
         assert sub.definition in prompt and "Respondent: An answer." in prompt
 
 
 def test_score_prompt_contains_rubric_levels_and_rules():
     _, template = llm.load_prompt("score")
-    prompt = llm.score_prompt(template, RUBRIC, SUBS[0], MESSAGES)
+    prompt = llm.score_prompt(template, RUBRIC, SUBS[0], MESSAGES, [])
     for text in SUBS[0].levels.values():
         assert text in prompt
     assert RUBRIC.rules.mixed_evidence in prompt and RUBRIC.rules.insufficient_evidence in prompt
@@ -86,9 +86,9 @@ def test_next_question_is_required_except_for_the_last_subdimension():
 
 def test_check_prompt_contains_the_next_topic():
     _, template = llm.load_prompt("check")
-    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT)
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
     assert NEXT.opening_question in prompt and NEXT.definition in prompt
-    assert "There is no next topic" in llm.check_prompt(template, RUBRIC, SUB, MESSAGES, None)
+    assert "There is no next topic" in llm.check_prompt(template, RUBRIC, SUB, MESSAGES, None, [])
 
 
 def test_check_to_log_has_the_log_shape():
@@ -151,7 +151,7 @@ def test_criteria_text_contains_not_applicable_condition():
 
 def test_check_prompt_contains_levels_and_follow_up_rules():
     _, template = llm.load_prompt("check")
-    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT)
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
     for text in SUB.levels.values():
         assert text in prompt
     assert RUBRIC.rules.follow_up_purpose in prompt and RUBRIC.rules.not_applicable in prompt
@@ -215,9 +215,23 @@ def test_openai_model_check_and_score_return_the_log_format():
         level=3, reason="r", why_not_higher="w", flags=[],
     )
     model = llm.OpenAIModel(FakeClient(check), "gpt-6.1-sol", 1.0)
-    assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
+    assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT, []))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
     model = llm.OpenAIModel(FakeClient(score), "gpt-6.1-sol", 1.0)
-    assert asyncio.run(model.score(RUBRIC, sub, MESSAGES))["level"] == 3
+    assert asyncio.run(model.score(RUBRIC, sub, MESSAGES, []))["level"] == 3
     info = model.info()
     assert info["model"] == {"id": "gpt-6.1-sol", "settings": {"temperature": 1.0}}
     assert info["prompt_versions"]["check"] == llm.load_prompt("check")[0]
+
+
+def test_prompts_contain_the_dimension_context():
+    context = [{"subdimension": "Earlier topic", "messages": [{"role": "respondent", "text": "As said before."}]}]
+    for name in ["check", "score"]:
+        _, template = llm.load_prompt(name)
+        if name == "check":
+            prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, context)
+            empty = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
+        else:
+            prompt = llm.score_prompt(template, RUBRIC, SUB, MESSAGES, context)
+            empty = llm.score_prompt(template, RUBRIC, SUB, MESSAGES, [])
+        assert "## Earlier topic" in prompt and "Respondent: As said before." in prompt
+        assert "this is the first topic of the dimension" in empty

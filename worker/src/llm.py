@@ -109,6 +109,16 @@ def format_transcript(messages: list[dict]) -> str:
     return "\n\n".join(f"{names[m['role']]}: {m['text']}" for m in messages)
 
 
+def format_context(context: list[dict]) -> str:
+    """context: [{"subdimension": name, "messages": [...]}] of other
+    subdimensions of the same dimension."""
+    if not context:
+        return "None: this is the first topic of the dimension."
+    return "\n\n".join(
+        f"## {part['subdimension']}\n\n{format_transcript(part['messages'])}" for part in context
+    )
+
+
 def format_next_topic(next_sub: Subdimension | None) -> str:
     if next_sub is None:
         return "There is no next topic; this is the last one. next_question is null."
@@ -120,11 +130,12 @@ def format_next_topic(next_sub: Subdimension | None) -> str:
 
 
 def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict],
-                 next_sub: Subdimension | None) -> str:
+                 next_sub: Subdimension | None, context: list[dict]) -> str:
     return fill(template, {
         "name": sub.name,
         "definition": sub.definition,
         "next_topic": format_next_topic(next_sub),
+        "context": format_context(context),
         "criteria": format_criteria(sub),
         "levels": format_levels(sub),
         "rules": format_rules([rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans]),
@@ -132,11 +143,13 @@ def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: lis
     })
 
 
-def score_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict]) -> str:
+def score_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict],
+                 context: list[dict]) -> str:
     rules = rubric.rules
     return fill(template, {
         "name": sub.name,
         "definition": sub.definition,
+        "context": format_context(context),
         "criteria": format_criteria(sub),
         "levels": format_levels(sub),
         "rules": format_rules([
@@ -186,13 +199,14 @@ class OpenAIModel:
         }
 
     async def check(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
-                    next_sub: Subdimension | None) -> dict:
-        prompt = check_prompt(self.check_template, rubric, sub, messages, next_sub)
+                    next_sub: Subdimension | None, context: list[dict]) -> dict:
+        prompt = check_prompt(self.check_template, rubric, sub, messages, next_sub, context)
         result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, CheckResult)
         return check_to_log(result, sub, next_sub)
 
-    async def score(self, rubric: Rubric, sub: Subdimension, messages: list[dict]) -> dict:
-        prompt = score_prompt(self.score_template, rubric, sub, messages)
+    async def score(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
+                    context: list[dict]) -> dict:
+        prompt = score_prompt(self.score_template, rubric, sub, messages, context)
         result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, ScoreResult)
         return score_to_log(result, sub)
 
