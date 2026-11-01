@@ -37,7 +37,15 @@ subdimensions, and main.py scores them in the background with
 score_subdimension while the respondent reads the next question.
 """
 
+from datetime import datetime, timezone
+
 from rubric import Rubric, Rules, Subdimension
+
+
+def now() -> str:
+    """The current time (UTC, ISO 8601), stored with every message ("at") so
+    the time per conversation and per dimension can be measured."""
+    return datetime.now(timezone.utc).isoformat()
 
 # Draft text, to be reviewed by the author.
 INTRO = (
@@ -97,8 +105,8 @@ def new_conversation(rubric: Rubric, conversation_id: str, started_at: str,
         "follow_ups_dimension": 0,
         "dimensions": [dim.name for dim in rubric.dimensions],
         "transcript": [
-            {"subdimension": None, "role": "chatbot", "text": INTRO},
-            {"subdimension": first.name, "role": "chatbot", "text": first.opening_question},
+            {"subdimension": None, "role": "chatbot", "text": INTRO, "at": started_at},
+            {"subdimension": first.name, "role": "chatbot", "text": first.opening_question, "at": started_at},
         ],
         "checks": [],
         "finished": [],
@@ -143,7 +151,7 @@ def earlier_in_dimension(rubric: Rubric, state: dict, dimension_name: str, sub: 
 def messages_of(state: dict, sub: Subdimension) -> list[dict]:
     """The transcript of one subdimension, as the prompts get it."""
     return [
-        {"role": m["role"], "text": m["text"]}
+        {"role": m["role"], "text": m["text"], "at": m.get("at")}
         for m in state["transcript"]
         if m["subdimension"] == sub.name
     ]
@@ -158,7 +166,7 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
     """
     subdimensions = all_subdimensions(rubric)
     dimension_name, sub = subdimensions[state["subdimension_index"]]
-    state["transcript"].append({"subdimension": sub.name, "role": "respondent", "text": answer})
+    state["transcript"].append({"subdimension": sub.name, "role": "respondent", "text": answer, "at": now()})
 
     # Check the message, then let the code decide what happens next.
     is_last = state["subdimension_index"] + 1 == len(subdimensions)
@@ -177,7 +185,7 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
         else:
             state["follow_ups"] += 1
             state["follow_ups_dimension"] += 1
-        state["transcript"].append({"subdimension": sub.name, "role": "chatbot", "text": check["reply"]})
+        state["transcript"].append({"subdimension": sub.name, "role": "chatbot", "text": check["reply"], "at": now()})
         return check["reply"], False, []
 
     # The subdimension is finished. Keep what is needed to score it; the
@@ -210,14 +218,14 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
     state["checks"] = []
     if state["subdimension_index"] == len(subdimensions):
         state["done"] = True
-        state["transcript"].append({"subdimension": None, "role": "chatbot", "text": CLOSING})
+        state["transcript"].append({"subdimension": None, "role": "chatbot", "text": CLOSING, "at": now()})
         return CLOSING, True, to_score
 
     next_dimension_name, next_sub = subdimensions[state["subdimension_index"]]
     if next_dimension_name != dimension_name:
         state["follow_ups_dimension"] = 0  # a new dimension has its own follow-up budget
     question = check["next_question"]  # written by the model in the check
-    state["transcript"].append({"subdimension": next_sub.name, "role": "chatbot", "text": question})
+    state["transcript"].append({"subdimension": next_sub.name, "role": "chatbot", "text": question, "at": now()})
     return question, False, to_score
 
 

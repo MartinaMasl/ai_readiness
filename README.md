@@ -275,7 +275,8 @@ subdimension from `subdimension_results`. The script
     {
       "subdimension": "Ownership and Stewardship",
       "core_question": "Who is responsible for your organization's key datasets, …",
-      "transcript": [{"role": "chatbot", "text": "…"}, {"role": "respondent", "text": "…"}],
+      "transcript": [{"role": "chatbot", "text": "…", "at": "2026-11-01T10:00:00+00:00"},
+                     {"role": "respondent", "text": "…", "at": "2026-11-01T10:01:00+00:00"}],
       "checks": [
         {
           "message_type": "answer",
@@ -292,7 +293,11 @@ subdimension from `subdimension_results`. The script
 }
 ```
 
-`action` records what the code did with each check. `core_question` is the
+Every message has a timestamp (`at`, UTC), from which the export calculates
+the time per conversation, per dimension and per subdimension: from the first
+question shown to the last answer, split into the time spent waiting for the
+chatbot and the respondent's own time (see `src/timing.py`). `action` records
+what the code did with each check. `core_question` is the
 rubric's question; the first chatbot message of the transcript is what was
 actually asked. The `review` block is filled in by hand by the author.
 
@@ -401,6 +406,8 @@ worker/
   scripts/try_prompts.py      runs both prompts on hand-written answers
   scripts/show_log.py         prints the whole log of a conversation
   scripts/add_respondent.py   creates and lists personal links
+  scripts/export_scores.py    scores, times and metrics as CSV, for the analysis per respondent and role
+  src/timing.py               time per conversation, dimension and subdimension (from message timestamps)
   scripts/rescore.py          scores saved conversations again, to compare rule and prompt versions
 DECISIONS.md                  every design decision with date and reason
 claude.md                     the project specification
@@ -426,6 +433,8 @@ uv run python scripts/try_prompts.py           # prompts on hand-written answers
 uv run python scripts/add_respondent.py R01 technical    # personal link (local; add --remote --url https://… for the live site)
 uv run python scripts/add_respondent.py --list           # all respondents and their links
 uv run python scripts/show_log.py --list       # latest conversations, with respondent and role
+uv run python scripts/export_scores.py conversations --remote > ~/Desktop/conversations.csv   # one row per conversation
+uv run python scripts/export_scores.py subdimensions --remote > ~/Desktop/subdimensions.csv   # one row per subdimension
 uv run python scripts/show_log.py <id>         # one conversation's log (--remote for the live site)
 ```
 

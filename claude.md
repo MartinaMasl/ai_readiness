@@ -214,8 +214,8 @@ Per subdimension:
   "subdimension": "Ownership and Stewardship",
   "core_question": "Who is responsible for your organization's key datasets, and how is that decided?",
   "transcript": [
-    {"role": "chatbot", "text": "..."},
-    {"role": "respondent", "text": "..."}
+    {"role": "chatbot", "text": "...", "at": "2026-11-01T10:00:00+00:00"},
+    {"role": "respondent", "text": "...", "at": "2026-11-01T10:01:00+00:00"}
   ],
   "checks": [
     {
@@ -342,6 +342,8 @@ worker/tests/                tests; fakes.py is a fake model for the flow tests
 worker/scripts/try_prompts.py  step 4: runs both prompts on hand-written answers
 worker/scripts/show_log.py   prints one conversation's whole log
 worker/scripts/add_respondent.py  creates and lists personal links
+worker/scripts/export_scores.py  scores, times and metrics per conversation or subdimension as CSV
+worker/src/timing.py         time per conversation, dimension and subdimension from the message timestamps
 worker/scripts/rescore.py    scores saved conversations again, to compare rule and prompt versions
 DECISIONS.md
 ```
