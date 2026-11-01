@@ -35,8 +35,11 @@ def test_report_uses_rubric_texts():
     assert data["score_display"] == "3.67"
     assert data["level"] == {"number": 3, "name": RUBRIC.scale[3].name}
     assert data["report_text"] == DATA.report_levels[3]
-    assert report["overall"]["level"]["number"] == 3
-    assert report["overall"]["description"] == RUBRIC.scale[3].description
+    # With all four dimensions the real rubric gives the thesis's worked example.
+    assert [d["score_display"] for d in report["dimensions"]] == ["3.67", "3.33", "2.67", "0.67"]
+    assert report["overall"]["score_display"] == "2.58"
+    assert report["overall"]["level"]["number"] == 2
+    assert report["overall"]["description"] == RUBRIC.scale[2].description
 
 
 def test_missing_subdimension_score_is_an_error():

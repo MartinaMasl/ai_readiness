@@ -141,6 +141,35 @@ def next_action(rules: Rules, state: dict, check: dict) -> str:
     return "score"
 
 
+def transition_phrase(rules: Rules, position: int) -> str:
+    """The transition phrase for the topic at this position in the
+    conversation (0 = the first topic, which has none). The code chooses it,
+    not the model, because the model cannot see which phrase it used before:
+    the second topic gets the first phrase, the third the second, and so on,
+    starting again after the last. "" means no transition phrase."""
+    phrases = rules.transition_phrases
+    if position == 0 or not phrases:
+        return ""
+    return phrases[(position - 1) % len(phrases)]
+
+
+def next_topic(rubric: Rubric, subdimensions: list, index: int) -> dict | None:
+    """What the check needs to write the question for the next topic: the
+    next subdimension, its transition phrase, and whether a dimension ends
+    there. None if the current subdimension is the last one."""
+    if index + 1 == len(subdimensions):
+        return None
+    dimension_name, _ = subdimensions[index]
+    next_dimension_name, next_sub = subdimensions[index + 1]
+    new_dimension = next_dimension_name != dimension_name
+    return {
+        "sub": next_sub,
+        "phrase": transition_phrase(rubric.rules, index + 1),
+        "ended_dimension": dimension_name if new_dimension else None,
+        "next_dimension": next_dimension_name if new_dimension else None,
+    }
+
+
 def earlier_in_dimension(rubric: Rubric, state: dict, dimension_name: str, sub: Subdimension) -> list[dict]:
     """The transcripts of the subdimensions before sub in the same dimension."""
     dimension = next(d for d in rubric.dimensions if d.name == dimension_name)
@@ -170,11 +199,13 @@ async def handle_answer(rubric: Rubric, state: dict, answer: str, model) -> tupl
 
     # Check the message, then let the code decide what happens next.
     is_last = state["subdimension_index"] + 1 == len(subdimensions)
-    next_sub = None if is_last else subdimensions[state["subdimension_index"] + 1][1]
+    topic = next_topic(rubric, subdimensions, state["subdimension_index"])
     context = earlier_in_dimension(rubric, state, dimension_name, sub)
-    check = await model.check(rubric, sub, messages_of(state, sub), next_sub, context)
+    check = await model.check(rubric, sub, messages_of(state, sub), topic, context)
     action = next_action(rubric.rules, state, check)
     check["action"] = action  # recorded in the log: what the code did with this check
+    # Recorded in the log: the phrase the code chose for next_question.
+    check["transition_phrase"] = topic["phrase"] if topic else None
     state["checks"].append(check)
 
     if action != "score":

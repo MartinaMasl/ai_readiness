@@ -21,6 +21,7 @@ from openai import AsyncOpenAI, APIStatusError
 WORKER = Path(__file__).parent.parent
 sys.path.insert(0, str(WORKER / "src"))
 
+import flow  # noqa: E402
 import llm  # noqa: E402
 from rubric import load_rubric  # noqa: E402
 
@@ -134,10 +135,12 @@ async def main() -> None:
         print(f"\n=== Case {number}: {case['title']} ({sub.name})")
         print(llm.format_transcript(messages))
         print("\n--- check")
-        position = in_order.index(sub)
-        next_sub = in_order[position + 1] if position + 1 < len(in_order) else None
-        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, next_sub, []),
-                  llm.CheckResult, sub, lambda result, sub: llm.check_to_log(result, sub, next_sub))
+        subdimensions = flow.all_subdimensions(rubric)
+        topic = flow.next_topic(rubric, subdimensions, in_order.index(sub))
+        if topic:
+            print(f"  (transition phrase: {topic['phrase']!r}, area ended: {topic['ended_dimension']})")
+        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, topic, []),
+                  llm.CheckResult, sub, lambda result, sub: llm.check_to_log(result, sub, topic))
         print("\n--- score")
         await run(client, settings, llm.score_prompt(score_template, rubric, sub, messages, []), llm.ScoreResult, sub, llm.score_to_log)
 

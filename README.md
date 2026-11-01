@@ -148,9 +148,17 @@ about, and criteria that do not apply, are never asked about again.
 Only the very first question is fixed. Every later question is written by the
 model, so the conversation can connect to what the respondent said. The
 rubric's `opening_question` becomes the **core question**: the model must ask
-about the same thing, in its own words, after a short transition. The
-question for the next subdimension is written in the same check call, so it
-costs no extra model call and no extra waiting time.
+about the same thing, in its own words. The question for the next
+subdimension is written in the same check call, so it costs no extra model
+call and no extra waiting time.
+
+The **transition phrase** that opens a new topic ("Moving on to", "Let's talk
+about", …, or none) is chosen by the code, not the model: each check call
+writes one transition without seeing the earlier ones, so the model always
+picked the same phrase. The code rotates through `transition_phrases` in the
+rubric by the position of the topic, so consecutive topics never get the same
+phrase, and tells the model when a dimension has ended ("That's all for
+data."). The chosen phrase is recorded in the log.
 
 ### 4.5 Background scoring
 
@@ -282,7 +290,8 @@ subdimension from `subdimension_results`. The script
           "message_type": "answer",
           "criteria": {"assignment": {"status": "evidence", "quote": "…"}, "…": "…"},
           "follow_up_needed": true, "targets": ["documentation"],
-          "reply": "…", "next_question": "…", "action": "follow_up"
+          "reply": "…", "next_question": "…", "action": "follow_up",
+          "transition_phrase": "Moving on to"
         }
       ],
       "counters": {"follow_ups": 1, "clarifications": 0, "redirects": 0, "follow_ups_dimension": 1},
@@ -332,7 +341,7 @@ locally, `worker/.dev.vars` overrides them.
 | `MODEL_ID` | `gpt-6.1-sol` | Model for both calls |
 | `TEMPERATURE` | `1` | Model temperature |
 | `TEST_MODE` | `0` | `1` shows the result of each check in a box on the chat page, for testing only. When it is `0`, the API does not send this information at all. |
-| `DIMENSIONS` | empty (all) | e.g. `Data`: new conversations cover only these dimensions; for testing with fewer model calls |
+| `DIMENSIONS` | `Data` (for now; empty = all dimensions for the real respondents) | new conversations cover only these dimensions; for testing with fewer model calls |
 | `OPENAI_API_KEY` | secret | Stored as a Cloudflare secret, locally in `.dev.vars`; never in the repository |
 
 ## 10. Testing

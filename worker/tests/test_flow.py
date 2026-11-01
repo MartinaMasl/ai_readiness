@@ -167,7 +167,7 @@ def test_log_entry_has_the_agreed_shape():
     assert set(entry) == {"subdimension", "core_question", "context", "transcript", "checks", "counters", "score", "review"}
     assert set(entry["counters"]) == {"follow_ups", "clarifications", "redirects", "follow_ups_dimension"}
     assert set(entry["checks"][0]) == {"message_type", "criteria", "follow_up_needed", "targets", "reply",
-                                       "next_question", "action"}
+                                       "next_question", "action", "transition_phrase"}
     assert [m["role"] for m in entry["transcript"]] == ["chatbot", "respondent", "chatbot", "respondent"]
     assert entry["review"] == {"my_level": None, "error_type": None, "note": None}
 
@@ -255,3 +255,25 @@ def test_unscored_lists_finished_subdimensions_without_a_level():
     first_dimension = SUBS[0][0]
     only_first = {first_dimension: {SUBS[0][1].name: 4}}
     assert [f["subdimension"] for f in flow.unscored(state, only_first)] == [s.name for _, s in SUBS[1:3]]
+
+
+def test_consecutive_topics_never_get_the_same_transition_phrase():
+    phrases = [flow.transition_phrase(RULES, position) for position in range(60)]
+    assert phrases[0] == ""  # the first topic is the fixed first question
+    assert phrases[1:1 + len(RULES.transition_phrases)] == RULES.transition_phrases  # in turn, from the first
+    for this, following in zip(phrases[1:], phrases[2:]):
+        assert this != following
+
+
+def test_next_topic_says_when_a_dimension_ends_and_the_log_keeps_the_phrase():
+    subdimensions = flow.all_subdimensions(RUBRIC)
+    within = flow.next_topic(RUBRIC, subdimensions, 0)
+    assert within["sub"] == SUBS[1][1] and within["ended_dimension"] is None
+    assert within["phrase"] == RULES.transition_phrases[0]
+    across = flow.next_topic(RUBRIC, subdimensions, 2)  # last Data subdimension
+    assert (across["ended_dimension"], across["next_dimension"]) == (SUBS[0][0], SUBS[3][0])
+    assert flow.next_topic(RUBRIC, subdimensions, len(subdimensions) - 1) is None
+
+    state, log = start()
+    say(state, log, "an answer")
+    assert state["checks"][0]["transition_phrase"] == RULES.transition_phrases[0]

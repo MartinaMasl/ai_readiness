@@ -73,20 +73,21 @@ def make_check(sub, statuses, **fields):
 
 SUB = SUBS[0]  # Discoverability: monitoring has a not_applicable_if condition
 NEXT = SUBS[1]
+NEXT_TOPIC = {"sub": NEXT, "phrase": "Moving on to", "ended_dimension": None, "next_dimension": None}
 
 
 def test_next_question_is_required_except_for_the_last_subdimension():
     check = make_check(SUB, ["evidence"] * 3 + ["not_applicable"], next_question=None)
     with pytest.raises(ValueError):
-        llm.check_to_log(check, SUB, NEXT)
+        llm.check_to_log(check, SUB, NEXT_TOPIC)
     assert llm.check_to_log(check, SUB, None)["next_question"] is None
     check = make_check(SUB, ["evidence"] * 3 + ["not_applicable"], next_question="Next?")
-    assert llm.check_to_log(check, SUB, NEXT)["next_question"] == "Next?"
+    assert llm.check_to_log(check, SUB, NEXT_TOPIC)["next_question"] == "Next?"
 
 
 def test_check_prompt_contains_the_next_topic():
     _, template = llm.load_prompt("check")
-    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT_TOPIC, [])
     assert NEXT.opening_question in prompt and NEXT.definition in prompt
     assert "There is no next topic" in llm.check_prompt(template, RUBRIC, SUB, MESSAGES, None, [])
 
@@ -94,7 +95,7 @@ def test_check_prompt_contains_the_next_topic():
 def test_check_to_log_has_the_log_shape():
     check = make_check(SUB, ["evidence", "missing", "dont_know", "not_applicable"],
                        follow_up_needed=True, targets=[SUB.criteria[1].id], reply="A follow-up?")
-    entry = llm.check_to_log(check, SUB, NEXT)
+    entry = llm.check_to_log(check, SUB, NEXT_TOPIC)
     assert entry["criteria"][SUB.criteria[0].id] == {"status": "evidence", "quote": "q"}
     assert entry["criteria"][SUB.criteria[3].id] == {"status": "not_applicable", "quote": None}
     assert entry["targets"] == [SUB.criteria[1].id] and entry["reply"] == "A follow-up?"
@@ -105,23 +106,23 @@ def test_follow_up_may_target_only_missing_criteria():
         check = make_check(SUB, ["missing", "missing", "missing", status],
                            follow_up_needed=True, targets=[SUB.criteria[3].id], reply="?")
         with pytest.raises(ValueError):
-            llm.check_to_log(check, SUB, NEXT)
+            llm.check_to_log(check, SUB, NEXT_TOPIC)
 
 
 def test_follow_up_targets_one_or_two_criteria():
     three = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
                        targets=[c.id for c in SUB.criteria[:3]], reply="?")
     with pytest.raises(ValueError):
-        llm.check_to_log(three, SUB, NEXT)
+        llm.check_to_log(three, SUB, NEXT_TOPIC)
     two = make_check(SUB, ["missing"] * 4, follow_up_needed=True,
                      targets=[c.id for c in SUB.criteria[:2]], reply="?")
-    assert len(llm.check_to_log(two, SUB, NEXT)["targets"]) == 2
+    assert len(llm.check_to_log(two, SUB, NEXT_TOPIC)["targets"]) == 2
 
 
 def test_not_applicable_only_where_the_rubric_has_a_condition():
     check = make_check(SUB, ["not_applicable", "evidence", "evidence", "evidence"])
     with pytest.raises(ValueError):
-        llm.check_to_log(check, SUB, NEXT)
+        llm.check_to_log(check, SUB, NEXT_TOPIC)
 
 
 def test_question_and_off_topic_need_a_reply():
@@ -137,11 +138,11 @@ def test_check_to_log_refuses_wrong_criteria_and_evidence_without_quote():
         follow_up_needed=False, targets=[], reply=None, next_question="Next?",
     )
     with pytest.raises(ValueError):
-        llm.check_to_log(wrong_ids, SUB, NEXT)
+        llm.check_to_log(wrong_ids, SUB, NEXT_TOPIC)
     no_quote = make_check(SUB, ["evidence"] * 3 + ["not_applicable"])
     no_quote.criteria[0].quote = None
     with pytest.raises(ValueError):
-        llm.check_to_log(no_quote, SUB, NEXT)
+        llm.check_to_log(no_quote, SUB, NEXT_TOPIC)
 
 
 def test_criteria_text_contains_not_applicable_condition():
@@ -151,10 +152,11 @@ def test_criteria_text_contains_not_applicable_condition():
 
 def test_check_prompt_contains_levels_and_follow_up_rules():
     _, template = llm.load_prompt("check")
-    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT_TOPIC, [])
     for text in SUB.levels.values():
         assert text in prompt
     assert RUBRIC.rules.follow_up_purpose in prompt and RUBRIC.rules.not_applicable in prompt
+    assert RUBRIC.rules.language in prompt and RUBRIC.rules.transitions in prompt
 
 
 def test_score_to_log_has_the_log_shape():
@@ -215,7 +217,7 @@ def test_openai_model_check_and_score_return_the_log_format():
         level=3, reason="r", why_not_higher="w", flags=[],
     )
     model = llm.OpenAIModel(FakeClient(check), "gpt-6.1-sol", 1.0)
-    assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT, []))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
+    assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT_TOPIC, []))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
     model = llm.OpenAIModel(FakeClient(score), "gpt-6.1-sol", 1.0)
     assert asyncio.run(model.score(RUBRIC, sub, MESSAGES, []))["level"] == 3
     info = model.info()
@@ -228,10 +230,20 @@ def test_prompts_contain_the_dimension_context():
     for name in ["check", "score"]:
         _, template = llm.load_prompt(name)
         if name == "check":
-            prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, context)
-            empty = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT, [])
+            prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT_TOPIC, context)
+            empty = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT_TOPIC, [])
         else:
             prompt = llm.score_prompt(template, RUBRIC, SUB, MESSAGES, context)
             empty = llm.score_prompt(template, RUBRIC, SUB, MESSAGES, [])
         assert "## Earlier topic" in prompt and "Respondent: As said before." in prompt
         assert "this is the first topic of the dimension" in empty
+
+
+def test_check_prompt_gets_the_transition_phrase_and_the_end_of_an_area():
+    _, template = llm.load_prompt("check")
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, NEXT_TOPIC, [])
+    assert 'Transition phrase: "Moving on to"' in prompt and "same area" in prompt
+    new_area = dict(NEXT_TOPIC, phrase="", ended_dimension="Data", next_dimension="People")
+    prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, new_area, [])
+    assert "Transition phrase: none" in prompt
+    assert 'starts a new area, "People"' in prompt and 'The area "Data" has just ended' in prompt

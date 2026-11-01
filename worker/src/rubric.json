@@ -1,5 +1,5 @@
 {
-  "version": "0.9",
+  "version": "0.11",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
@@ -11,8 +11,16 @@
     "plans": "Score the current state. Plans and intentions do not count.",
     "insufficient_evidence": "Set the flag 'insufficient_evidence' when at least one criterion has no evidence, for example because the respondent did not know or the follow-up limit was reached. A criterion that is not applicable does not count as missing evidence. If some criteria have evidence, score on that evidence. If no criterion has evidence, the score is 0.",
     "not_applicable": "A criterion is not applicable when the condition in its 'not_applicable_if' is met. Do not ask about it, and do not treat it as missing evidence.",
-    "language": "Write questions and replies in plain language that both technical and business respondents understand. Avoid jargon and abbreviations; if a technical term is needed, explain it in a few words. Keep questions short and ask about one thing at a time.",
-    "transitions": "Vary how you move to a new topic. Do not use the same phrase every time, such as 'Turning to'. Use different expressions, for example 'Moving on to', 'Next, let's look at', 'Let's move forward to', 'Now I'd like to ask about', or start with the question itself without a transition phrase."
+    "language": "Write questions and replies in plain language that both technical and business respondents understand. Avoid jargon and abbreviations; if a technical term is needed, explain it in a few words. Keep questions short and focused: a question may have at most two closely related parts, and never more.",
+    "transitions": "Start the question for a new topic with the transition phrase you are given, adapted so it reads naturally with the topic. If the phrase is empty, start directly with the question. Do not add another transition phrase of your own. When the new topic begins a new dimension, first say in a few words that the previous area is finished, for example \"That's all for data.\"",
+    "transition_phrases": [
+      "Moving on to",
+      "Let's move forward to",
+      "Now I'd like to ask about",
+      "Next, let's look at",
+      "Let's talk about",
+      ""
+    ]
   },
   "scale": {
     "0": {

@@ -119,26 +119,42 @@ def format_context(context: list[dict]) -> str:
     )
 
 
-def format_next_topic(next_sub: Subdimension | None) -> str:
-    if next_sub is None:
+def format_next_topic(next_topic: dict | None) -> str:
+    """next_topic: from flow.next_topic(), with the next subdimension, the
+    transition phrase chosen by the code and whether a dimension ends."""
+    if next_topic is None:
         return "There is no next topic; this is the last one. next_question is null."
+    sub = next_topic["sub"]
+    phrase = (f'"{next_topic["phrase"]}"' if next_topic["phrase"]
+              else "none: start directly with the question")
+    if next_topic["ended_dimension"]:
+        dimension = (f'This topic starts a new area, "{next_topic["next_dimension"]}". '
+                     f'The area "{next_topic["ended_dimension"]}" has just ended.')
+    else:
+        dimension = "This topic is in the same area as the current one."
     return (
-        f"Name: {next_sub.name}\n"
-        f"Definition: {next_sub.definition}\n"
-        f"Core question: {next_sub.opening_question}"
+        f"Name: {sub.name}\n"
+        f"Definition: {sub.definition}\n"
+        f"Core question: {sub.opening_question}\n"
+        f"Transition phrase: {phrase}\n"
+        f"{dimension}"
     )
 
 
 def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: list[dict],
-                 next_sub: Subdimension | None, context: list[dict]) -> str:
+                 next_topic: dict | None, context: list[dict]) -> str:
     return fill(template, {
         "name": sub.name,
         "definition": sub.definition,
-        "next_topic": format_next_topic(next_sub),
+        "next_topic": format_next_topic(next_topic),
         "context": format_context(context),
         "criteria": format_criteria(sub),
         "levels": format_levels(sub),
-        "rules": format_rules([rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans]),
+        "rules": format_rules([
+            rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans,
+            # How every question and reply the check writes is worded, next_question included.
+            rubric.rules.language, rubric.rules.transitions,
+        ]),
         "transcript": format_transcript(messages),
     })
 
@@ -199,10 +215,10 @@ class OpenAIModel:
         }
 
     async def check(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
-                    next_sub: Subdimension | None, context: list[dict]) -> dict:
-        prompt = check_prompt(self.check_template, rubric, sub, messages, next_sub, context)
+                    next_topic: dict | None, context: list[dict]) -> dict:
+        prompt = check_prompt(self.check_template, rubric, sub, messages, next_topic, context)
         result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, CheckResult)
-        return check_to_log(result, sub, next_sub)
+        return check_to_log(result, sub, next_topic)
 
     async def score(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
                     context: list[dict]) -> dict:
@@ -219,7 +235,7 @@ def _check_criterion_ids(sub: Subdimension, ids: list[str]) -> None:
         raise ValueError(f"Expected criteria {expected}, the model returned {ids}")
 
 
-def check_to_log(result: CheckResult, sub: Subdimension, next_sub: Subdimension | None) -> dict:
+def check_to_log(result: CheckResult, sub: Subdimension, next_topic: dict | None) -> dict:
     """The check as it is stored in the state and the log, after checking
     that the model's answer is consistent."""
     _check_criterion_ids(sub, [c.criterion for c in result.criteria])
@@ -242,7 +258,7 @@ def check_to_log(result: CheckResult, sub: Subdimension, next_sub: Subdimension 
     needs_reply = result.message_type in ("question", "off_topic") or result.follow_up_needed
     if needs_reply and not result.reply:
         raise ValueError("A reply is needed but the model did not write one")
-    if next_sub is not None and not result.next_question:
+    if next_topic is not None and not result.next_question:
         raise ValueError("There is a next subdimension but the model wrote no next question")
     return {
         "message_type": result.message_type,
@@ -250,7 +266,7 @@ def check_to_log(result: CheckResult, sub: Subdimension, next_sub: Subdimension 
         "follow_up_needed": result.follow_up_needed,
         "targets": list(result.targets),
         "reply": result.reply if needs_reply else None,
-        "next_question": result.next_question if next_sub is not None else None,
+        "next_question": result.next_question if next_topic is not None else None,
     }
 
 

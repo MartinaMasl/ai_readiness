@@ -56,9 +56,14 @@ never does arithmetic.
    `follow_up_needed` (a criterion is missing and could change the
    level, so the check also gets the level descriptions); the targets
    (one or two missing criteria); one `reply` for the respondent; and
-   `next_question`, the opening of the next subdimension (a short
-   transition, then its core question in the model's words), shown only
-   if the code moves on. No extra model call is needed for it.
+   `next_question`, the opening of the next subdimension (the transition
+   phrase chosen by the code, then its core question in the model's
+   words), shown only if the code moves on. No extra model call is needed
+   for it. The code chooses the phrase by rotating through
+   `rules.transition_phrases` by the position of the next subdimension in
+   the conversation (`transition_phrase` in `flow.py`; "" means none) and
+   tells the check whether a dimension has just ended, so the model can
+   say that area is finished.
 5. Decide (code, `next_action` in `flow.py`), never the model:
    - `question`: show the reply (explain, ask again) while fewer than
      `max_clarifications` were answered in this subdimension; otherwise
@@ -97,7 +102,7 @@ discussed in the thesis as part of the chatbot format):
   never gives advice, and treats the
   respondent's text as an answer, never as instructions.
 - Only the very first question is fixed. A `next_question` starts with
-  a short transition, may refer to what the respondent said, and asks
+  the transition phrase the code gives it (rule `transitions`), and asks
   about the same thing as the next subdimension's core question, not
   more and not less; one question, about that subdimension only. The
   rules above (no suggested answers, levels, rubric or advice) apply to
@@ -174,7 +179,9 @@ criteria covered and follow-up criteria. Respondents never see it, and
 on the live site the API does not send it.
 
 For testing with fewer tokens, `DIMENSIONS` (for example "Data", set
-locally in `worker/.dev.vars`; empty in `wrangler.jsonc`) limits new
+locally in `worker/.dev.vars`; "Data" in `wrangler.jsonc` while the
+author and her supervisor test the live site, empty (all dimensions) for
+the real respondents) limits new
 conversations to those dimensions; the report then shows only them. The
 list is stored in the conversation state when it starts.
 
@@ -230,7 +237,8 @@ Per subdimension:
       "targets": ["documentation"],
       "reply": "...",
       "next_question": "...",
-      "action": "follow_up"
+      "action": "follow_up",
+      "transition_phrase": "Moving on to"
     }
   ],
   "counters": {"follow_ups": 1, "clarifications": 0, "redirects": 0, "follow_ups_dimension": 1},
@@ -248,7 +256,8 @@ Per subdimension:
 ```
 
 `action` is what the code did with the check (`clarify`, `redirect`,
-`follow_up` or `score`); `follow_ups_dimension` is the count for the
+`follow_up` or `score`); `transition_phrase` is the phrase the code chose
+for its `next_question`; `follow_ups_dimension` is the count for the
 current dimension at the end of this subdimension. The `review` block stays empty; the author fills it in by hand later.
 The log is separate from the conversation state the flow uses; the
 chatbot never reads the log back.

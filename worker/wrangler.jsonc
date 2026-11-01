@@ -35,7 +35,7 @@
 		"MODEL_ID": "gpt-6.1-sol",
 		"TEMPERATURE": "1",
 		"TEST_MODE": "0",
-		"DIMENSIONS": ""
+		"DIMENSIONS": "Data"
 	},
 	// Files in public/ are served directly (so / shows index.html).
 	// Requests that match no file, like /api, go to the FastAPI app.

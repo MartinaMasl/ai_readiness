@@ -30,7 +30,8 @@ class FakeModel:
     def __init__(self):
         self.contexts = []  # (call, subdimension, names of the context subdimensions), for the tests
 
-    async def check(self, rubric, sub, messages, next_sub, context) -> dict:
+    async def check(self, rubric, sub, messages, next_topic, context) -> dict:
+        next_sub = next_topic["sub"] if next_topic else None
         self.contexts.append(("check", sub.name, [part["subdimension"] for part in context]))
         answer = messages[-1]["text"]
         earlier = [m["text"] for m in messages[:-1] if m["role"] == "respondent"]
@@ -45,7 +46,7 @@ class FakeModel:
             check = llm.CheckResult(message_type=message_type, criteria=criteria,
                                     follow_up_needed=follow_up_needed, targets=list(targets), reply=reply,
                                     next_question=next_question)
-            return llm.check_to_log(check, sub, next_sub)
+            return llm.check_to_log(check, sub, next_topic)
 
         if answer.endswith("?"):
             return result("question", lambda c: "missing",

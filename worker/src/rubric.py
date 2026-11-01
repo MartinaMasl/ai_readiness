@@ -32,6 +32,11 @@ class Rules(BaseModel):
     plans: str
     insufficient_evidence: str
     not_applicable: str
+    language: str  # how questions and replies are worded
+    transitions: str  # how the model moves to a new topic
+    # Opening phrases for a new topic, chosen in turn by the code (flow.py);
+    # "" means no transition phrase.
+    transition_phrases: list[str]
 
 
 class ScaleLevel(BaseModel):
