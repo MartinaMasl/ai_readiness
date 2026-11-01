@@ -84,6 +84,11 @@ def conversation_rubric(state: dict):
     return only_dimensions(RUBRIC, state["dimensions"])
 
 
+class StartRequest(BaseModel):
+    # The token from the personal link (/?r=<token>).
+    respondent: str = Field(min_length=1, max_length=100)
+
+
 class AnswerRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 
@@ -94,12 +99,17 @@ def home():
 
 
 @api.post("/conversations")
-async def start_conversation(request: Request):
+async def start_conversation(body: StartRequest, request: Request):
     db = database(request)
+    # Only people with a personal link can start a conversation.
+    respondent = await storage.find_respondent(db, body.respondent)
+    if respondent is None:
+        raise HTTPException(status_code=403, detail="This link is not valid.")
     conversation_id = str(uuid.uuid4())
     rubric = only_dimensions(RUBRIC, dimensions_setting(request))
-    state, log = flow.new_conversation(rubric, conversation_id, storage.now(), model(request.scope["env"]).info())
-    await storage.save_state(db, conversation_id, state)
+    state, log = flow.new_conversation(rubric, conversation_id, storage.now(),
+                                       model(request.scope["env"]).info(), respondent)
+    await storage.create_conversation(db, conversation_id, state, respondent["code"])
     await storage.save_log(db, conversation_id, log)
     return {
         "id": conversation_id,

@@ -83,10 +83,11 @@ def check_summary(rubric: Rubric, state: dict) -> dict | None:
 
 
 def new_conversation(rubric: Rubric, conversation_id: str, started_at: str,
-                     model_info: dict) -> tuple[dict, dict]:
+                     model_info: dict, respondent: dict | None = None) -> tuple[dict, dict]:
     """Return the initial state and the log header. model_info: model id,
-    settings and prompt versions (OpenAIModel.info()). The log entries of
-    the subdimensions are saved separately, one per scored subdimension."""
+    settings and prompt versions (OpenAIModel.info()). respondent: code and
+    role of the person whose link started it. The log entries of the
+    subdimensions are saved separately, one per scored subdimension."""
     _, first = all_subdimensions(rubric)[0]
     state = {
         "subdimension_index": 0,
@@ -105,6 +106,7 @@ def new_conversation(rubric: Rubric, conversation_id: str, started_at: str,
     }
     log = {
         "id": conversation_id,
+        "respondent": respondent,
         "started_at": started_at,
         "model": model_info["model"],
         "rubric_version": rubric.version,

@@ -321,6 +321,9 @@
     return response.json();
   }
 
+  // The token from the personal link (/?r=<token>); the chatbot only starts with one.
+  const respondentToken = new URLSearchParams(location.search).get('r');
+
   function finish() {
     reportButton.disabled = false;
     statusLine.style.color = 'var(--muted)';
@@ -330,9 +333,13 @@
   function openReport() { location.href = '/result.html?id=' + conversationId; }
 
   async function start() {
+    if (!respondentToken) {
+      statusLine.textContent = 'This chatbot can only be opened with your personal link. Please use the link you received.';
+      return;
+    }
     const pending = aiMsgPending();
     try {
-      const data = await post('/api/conversations');
+      const data = await post('/api/conversations', { respondent: respondentToken });
       conversationId = data.id;
       outline = data.outline;
       position = data.position;
@@ -347,7 +354,9 @@
       setWaiting(false);
     } catch (error) {
       pending.element.remove();
-      statusLine.textContent = 'The conversation could not be started. Please reload the page.';
+      statusLine.textContent = error.message === '403'
+        ? 'This link is not valid. Please use the personal link you received.'
+        : 'The conversation could not be started. Please reload the page.';
     }
   }
 

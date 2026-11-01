@@ -1,6 +1,8 @@
 """Reads and writes the conversation state, the log and the results in D1.
 
-Three tables, connected by the conversation id (see migrations/):
+Four tables (see migrations/ for every column):
+- respondents: one row per invited person (code, role, link token),
+  created by the author with scripts/add_respondent.py
 - conversations: the state, one row per conversation, written by every answer
 - logs: the log header, one row per conversation, written at the start
 - subdimension_results: one row per scored subdimension (level and log
@@ -24,6 +26,22 @@ async def load_state(db, conversation_id: str) -> dict | None:
     if row is None:
         return None
     return json.loads(row["state"])
+
+
+async def find_respondent(db, token: str) -> dict | None:
+    """The respondent whose personal link has this token, or None."""
+    row = await db.prepare("SELECT code, role FROM respondents WHERE token = ?").bind(token).first()
+    if row is None:
+        return None
+    return {"code": row["code"], "role": row["role"]}
+
+
+async def create_conversation(db, conversation_id: str, state: dict, respondent_code: str) -> None:
+    """Save a new conversation, linked to the respondent whose link started it."""
+    timestamp = now()
+    await db.prepare(
+        "INSERT INTO conversations (id, state, created_at, updated_at, respondent_code) VALUES (?, ?, ?, ?, ?)"
+    ).bind(conversation_id, json.dumps(state), timestamp, timestamp, respondent_code).run()
 
 
 async def save_state(db, conversation_id: str, state: dict) -> None:

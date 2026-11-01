@@ -182,8 +182,10 @@ list is stored in the conversation state when it starts.
 
 All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
 
-- `POST /api/conversations`: starts a conversation. Returns the
-  conversation id, the intro message and the first `opening_question`.
+- `POST /api/conversations`: starts a conversation. Takes the token from
+  the respondent's personal link (`{"respondent": "<token>"}`); without a
+  valid token it answers 403. Returns the conversation id, the intro
+  message and the first `opening_question`.
 - `POST /api/conversations/{id}/answer`: takes the respondent's answer,
   runs the next step of the flow and returns the next chatbot message,
   or `done: true` when everything is scored.
@@ -253,11 +255,21 @@ chatbot never reads the log back.
 
 ## The database tables
 
-D1 has three tables, connected by the conversation id
-(`subdimension_results.conversation_id` is a foreign key to
-`conversations.id`). They are created by `worker/migrations/` and read
-and written only in `storage.py`. Each has one kind of writer, so a
-background score and an answer never overwrite each other.
+D1 has four tables. `logs` and `subdimension_results` are connected to
+`conversations` by the conversation id, and `conversations` to
+`respondents` by the respondent code (foreign keys). They are created by
+`worker/migrations/`, where every table and column is explained, and read
+and written only in `storage.py` (and the author's scripts). Each has one
+kind of writer, so a background score and an answer never overwrite each
+other.
+
+- `respondents`: one row per invited person: a pseudonymous code
+  (e.g. R01), the role (`technical` or `business`, set by the author) and
+  the token of their personal link. Created by the author with
+  `worker/scripts/add_respondent.py`. Names are never stored; the author
+  keeps the list connecting codes to names outside the database and the
+  repository. `conversations.respondent_code` says whose link started a
+  conversation; the code and role are also in the log header.
 
 - `conversations`: the chatbot's working memory, so the flow can
   continue. Workers forget everything between requests, so every answer
@@ -329,6 +341,8 @@ worker/migrations/           SQL that creates the D1 tables
 worker/tests/                tests; fakes.py is a fake model for the flow tests
 worker/scripts/try_prompts.py  step 4: runs both prompts on hand-written answers
 worker/scripts/show_log.py   prints one conversation's whole log
+worker/scripts/add_respondent.py  creates and lists personal links
+worker/scripts/rescore.py    scores saved conversations again, to compare rule and prompt versions
 DECISIONS.md
 ```
 
@@ -353,7 +367,7 @@ test what you built, and wait for the author before starting the next.
 5. The real model calls in the flow, replacing the fake chatbot.
 6. The other three dimensions in the rubric file (the author writes
    these).
-7. Rest of deployment: personal links, a consent screen.
+7. Rest of deployment: personal links (done), a consent screen.
 8. Pilot conversations and prompt refinement.
 
 Tests for step 2 must include this worked example from the thesis:

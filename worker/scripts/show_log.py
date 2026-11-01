@@ -35,10 +35,13 @@ def main() -> None:
         sys.exit(__doc__)
 
     if args[0] == "--list":
-        rows = query("SELECT id, created_at, json_extract(state, '$.done') AS done "
-                     "FROM conversations ORDER BY created_at DESC LIMIT 20", remote)
+        rows = query("SELECT c.id, c.created_at, json_extract(c.state, '$.done') AS done, "
+                     "c.respondent_code, r.role FROM conversations c "
+                     "LEFT JOIN respondents r ON r.code = c.respondent_code "
+                     "ORDER BY c.created_at DESC LIMIT 20", remote)
         for row in rows:
-            print(row["id"], row["created_at"], "finished" if row["done"] else "not finished")
+            who = f"{row['respondent_code']} ({row['role']})" if row["respondent_code"] else "no respondent"
+            print(row["id"], row["created_at"], "finished" if row["done"] else "not finished", " ", who)
         return
 
     conversation_id = args[0]

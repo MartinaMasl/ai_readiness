@@ -50,8 +50,14 @@ def test_starts_with_intro_and_first_opening_question():
     state, header = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
     assert state["transcript"][0]["text"] == flow.INTRO
     assert state["transcript"][1]["text"] == SUBS[0][1].opening_question
-    assert set(header) == {"id", "started_at", "model", "rubric_version", "prompt_versions"}
+    assert set(header) == {"id", "respondent", "started_at", "model", "rubric_version", "prompt_versions"}
     assert header["rubric_version"] == RUBRIC.version
+
+
+def test_log_header_records_the_respondent():
+    respondent = {"code": "R01", "role": "technical"}
+    _, header = flow.new_conversation(RUBRIC, "test-id", "2026-11-01T00:00:00+00:00", FakeModel().info(), respondent)
+    assert header["respondent"] == respondent
 
 
 def test_first_answer_gets_a_follow_up_then_next_opening_question():

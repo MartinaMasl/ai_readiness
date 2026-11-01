@@ -56,7 +56,8 @@ Every design decision, with its date and reason, is recorded in
 ```
  Respondent's browser            Cloudflare Worker (Python, FastAPI)           Cloudflare D1 (SQL)
  --------------------            -----------------------------------           -------------------
- index.html  chat page  ──────►  POST /api/conversations             ◄──────►  conversations
+ index.html  chat page  ──────►  POST /api/conversations             ◄──────►  respondents
+ (opened with /?r=<token>)                                                     conversations
                         ──────►  POST /api/conversations/{id}/answer           logs
  result.html report     ──────►  GET  /api/conversations/{id}/report           subdimension_results
                                           │
@@ -232,14 +233,17 @@ From the check prompt (decided by the author):
 
 ### 6.1 Tables
 
-Three tables in Cloudflare D1, connected by the conversation id
-(`subdimension_results.conversation_id` is a foreign key to
-`conversations.id`). Each table has exactly one kind of writer, so a
-background score and the next answer can never overwrite each other.
+Four tables in Cloudflare D1. `logs` and `subdimension_results` are connected
+to `conversations` by the conversation id, and `conversations` to
+`respondents` by the respondent code (foreign keys). Each table has exactly
+one kind of writer, so a background score and the next answer can never
+overwrite each other. Every table and column is explained in the SQL files in
+[`worker/migrations/`](worker/migrations/).
 
 | Table | One row per | Contains | Written by |
 |---|---|---|---|
-| `conversations` | conversation | the state as JSON: current subdimension, counters, transcript, checks of the current subdimension, finished subdimensions, done | every answer request |
+| `respondents` | invited person | pseudonymous code (e.g. R01), role (`technical` or `business`), token of the personal link | the author, with `add_respondent.py` |
+| `conversations` | conversation | the respondent's code, and the state as JSON: current subdimension, counters, transcript, checks of the current subdimension, finished subdimensions, done | every answer request |
 | `logs` | conversation | the log header as JSON: id, start time, model id and settings, rubric version, prompt versions | the start of the conversation |
 | `subdimension_results` | scored subdimension | the level (for the report) and the log entry as JSON | the background score |
 
@@ -396,6 +400,8 @@ worker/
   tests/                      pytest tests and the fake model
   scripts/try_prompts.py      runs both prompts on hand-written answers
   scripts/show_log.py         prints the whole log of a conversation
+  scripts/add_respondent.py   creates and lists personal links
+  scripts/rescore.py          scores saved conversations again, to compare rule and prompt versions
 DECISIONS.md                  every design decision with date and reason
 claude.md                     the project specification
 ```
@@ -417,7 +423,9 @@ uv run pywrangler dev                                          # http://localhos
 
 ```bash
 uv run python scripts/try_prompts.py           # prompts on hand-written answers
-uv run python scripts/show_log.py --list       # latest conversations
+uv run python scripts/add_respondent.py R01 technical    # personal link (local; add --remote --url https://… for the live site)
+uv run python scripts/add_respondent.py --list           # all respondents and their links
+uv run python scripts/show_log.py --list       # latest conversations, with respondent and role
 uv run python scripts/show_log.py <id>         # one conversation's log (--remote for the live site)
 ```
 
@@ -436,5 +444,8 @@ uv run pywrangler deploy
   to the OpenAI API.
 - The API key is a Cloudflare secret and, locally, in the git-ignored
   `.dev.vars`.
-- The chatbot is currently open to anyone with the link; personal links and a
-  consent screen are planned.
+- The chatbot can only be started with a personal link (`/?r=<token>`); each
+  conversation is linked to that respondent's pseudonymous code and role
+  (technical or business). Names are never stored; the author keeps the list
+  connecting codes to names outside the database and this repository.
+- A consent screen is planned.
