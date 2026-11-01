@@ -123,7 +123,7 @@ for every answer of the respondent:
         SCORE (model) the finished subdimension in the background
         save its level and log entry
 
-end:     the browser opens the report
+end:     closing message and a "View report" button; the report opens when pressed
 ```
 
 ### 4.3 The decision (`next_action` in `flow.py`)

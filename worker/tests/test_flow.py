@@ -48,7 +48,7 @@ def run_whole_conversation(rubric=RUBRIC):
 
 def test_starts_with_intro_and_first_opening_question():
     state, header = flow.new_conversation(RUBRIC, "test-id", "2026-10-15T00:00:00+00:00", FakeModel().info())
-    assert state["transcript"][0]["text"] == flow.INTRO
+    assert state["transcript"][0]["text"] == flow.intro(RUBRIC)
     assert state["transcript"][1]["text"] == SUBS[0][1].opening_question
     assert set(header) == {"id", "respondent", "started_at", "model", "rubric_version", "prompt_versions"}
     assert header["rubric_version"] == RUBRIC.version
@@ -277,3 +277,11 @@ def test_next_topic_says_when_a_dimension_ends_and_the_log_keeps_the_phrase():
     state, log = start()
     say(state, log, "an answer")
     assert state["checks"][0]["transition_phrase"] == RULES.transition_phrases[0]
+
+
+def test_intro_lists_only_the_dimensions_of_the_conversation():
+    assert "these areas: Data. " in flow.intro(only_dimensions(RUBRIC, ["Data"]))
+    assert "these areas: Data and People. " in flow.intro(only_dimensions(RUBRIC, ["Data", "People"]))
+    assert "these areas: Data, People, Strategy and Technology. " in flow.intro(RUBRIC)
+    state, _ = start(only_dimensions(RUBRIC, ["Data"]))
+    assert state["transcript"][0]["text"] == flow.intro(only_dimensions(RUBRIC, ["Data"]))

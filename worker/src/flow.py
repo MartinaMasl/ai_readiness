@@ -48,12 +48,25 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 # Draft text, to be reviewed by the author.
-INTRO = (
-    "Hello! This conversation assesses how ready your organization is for AI. "
-    "I will ask one question per topic and sometimes a short follow-up. "
-    "Please describe how things work in your organization today, not what is planned."
+# Written by the author. {areas} is filled with the dimensions this
+# conversation covers (see intro), so a Data-only run does not promise four.
+INTRO_TEMPLATE = (
+    "Hello! This conversation looks at how ready your organization is for AI. "
+    "We'll go through these areas: {areas}. "
+    "I'll ask about one topic at a time, sometimes with a short follow-up. "
+    "Please describe how things work in your organization today, not what is planned. "
+    "If you're not sure about something, just say so. "
+    "At the end, you can view your report."
 )
-CLOSING = "Thank you, that was the last question. Your results are ready."
+
+
+def intro(rubric: Rubric) -> str:
+    """The intro message, listing the dimensions of this conversation:
+    "Data", "Data and People", "Data, People, Strategy and Technology"."""
+    names = [dim.name for dim in rubric.dimensions]
+    areas = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return INTRO_TEMPLATE.format(areas=areas)
+CLOSING = "Thank you, that was the last question. You can now view your report."
 
 
 def all_subdimensions(rubric: Rubric) -> list[tuple[str, Subdimension]]:
@@ -105,7 +118,7 @@ def new_conversation(rubric: Rubric, conversation_id: str, started_at: str,
         "follow_ups_dimension": 0,
         "dimensions": [dim.name for dim in rubric.dimensions],
         "transcript": [
-            {"subdimension": None, "role": "chatbot", "text": INTRO, "at": started_at},
+            {"subdimension": None, "role": "chatbot", "text": intro(rubric), "at": started_at},
             {"subdimension": first.name, "role": "chatbot", "text": first.opening_question, "at": started_at},
         ],
         "checks": [],

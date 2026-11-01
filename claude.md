@@ -43,7 +43,8 @@ blocks you or looks wrong, say so and ask.
 Code controls the flow. The language model does two narrow tasks and
 never does arithmetic.
 
-1. Start: fixed intro message.
+1. Start: fixed intro message (the author's text, `INTRO_TEMPLATE` in
+   `flow.py`), listing the dimensions this conversation covers.
 2. Ask: the very first question of the conversation is the fixed
    `opening_question` of the first subdimension. Every later question is
    written by the model (see step 4): the rubric's `opening_question` is
@@ -168,9 +169,16 @@ what differs and ask.
 
 `worker/public/index.html` is the chat interface, shown at `/`. It is a
 plain HTML page in the same style as the report: a message list, a text
-box and a send button, with a little JavaScript that calls the API. When
-the last subdimension is scored, it sends the browser to
-`/result.html?id=<conversation id>`.
+box and a send button, with a little JavaScript that calls the API.
+The page itself never scrolls: the header, the dimension overview on the
+left and the input box stay in place, and only the messages scroll. New
+messages scroll to the bottom only if the reader is already there, so
+someone rereading earlier messages is not pulled down. On narrow screens
+the overview sits above the chat and shows only the current dimension.
+After the last answer the page shows the closing message and a "View
+report" button and disables the input box; the report
+(`/result.html?id=<conversation id>`) opens only when the respondent
+presses the button.
 
 In test mode only (`TEST_MODE` = "1", set locally in `worker/.dev.vars`;
 "0" in `wrangler.jsonc`), the API also returns a summary of the last

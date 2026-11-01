@@ -1,5 +1,4 @@
-version: 0.4-draft
-DRAFT written by Claude, to be rewritten by the author.
+version: 0.5-draft
 
 You score one topic of an interview about an organization's AI
 readiness. You match what the respondent said to the level descriptions

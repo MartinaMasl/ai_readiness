@@ -114,7 +114,7 @@ async def start_conversation(body: StartRequest, request: Request):
     return {
         "id": conversation_id,
         "started_at": log["started_at"],
-        "intro": flow.INTRO,
+        "intro": state["transcript"][0]["text"],
         "question": state["transcript"][-1]["text"],
         # For the progress sidebar: all dimensions and subdimensions, and
         # the position of the current subdimension in that list.

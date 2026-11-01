@@ -32,12 +32,16 @@
   }
   button, textarea { font: inherit; }
   .mono { font-family: 'IBM Plex Mono', monospace; }
-  .app { min-height: 100vh; display: flex; flex-direction: column; }
+  /* The page is exactly one screen high and never scrolls itself; only the
+     messages (.scroller) and, if needed, the overview (aside) scroll. */
+  html, body { height: 100%; overflow: hidden; }
+  .app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
 
   /* Header */
   header {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 16px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--line);
+    flex: none;
   }
   .brand { display: flex; align-items: center; gap: 12px; }
   .logo { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
@@ -54,10 +58,11 @@
   .btn:disabled { opacity: .4; cursor: not-allowed; }
 
   /* Layout */
-  .body { flex: 1; display: flex; flex-wrap: wrap; }
+  .body { flex: 1; min-height: 0; display: flex; }
   aside {
-    flex: 1 1 300px; max-width: 100%; padding: 28px 24px; background: var(--surface-alt);
+    flex: none; width: 320px; padding: 28px 24px; background: var(--surface-alt);
     border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 18px;
+    overflow-y: auto;
   }
   .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .aside-title { font-family: 'Newsreader', serif; font-size: 26px; line-height: 1.2; margin: 2px 0 0; font-weight: 500; }
@@ -83,9 +88,10 @@
   .dim-summary { font-size: 13px; color: var(--muted); }
   .dim.active .dim-summary { display: none; }
 
-  main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; }
+  main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .scroller { flex: 1; min-height: 0; overflow-y: auto; }
   .thread {
-    flex: 1; width: 100%; max-width: 820px; margin: 0 auto; padding: 32px 28px;
+    width: 100%; max-width: 820px; margin: 0 auto; padding: 32px 28px;
     display: flex; flex-direction: column; gap: 20px;
   }
   .divider { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
@@ -118,7 +124,7 @@
   .cp-open { background: var(--open-soft); } .cp-open .mono { color: var(--open); }
   .cp-note { font-size: 14px; color: var(--ink-soft); }
 
-  .composer { border-top: 1px solid var(--line); background: var(--surface); padding: 16px 28px 20px; }
+  .composer { flex: none; border-top: 1px solid var(--line); background: var(--surface); padding: 16px 28px 20px; }
   .composer form { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
   .input-row { display: flex; gap: 10px; align-items: flex-end; }
   textarea {
@@ -133,12 +139,26 @@
   .send:hover { background: var(--accent-ink); }
   .send:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
   .status { font-size: 13px; color: var(--open); min-height: 1.5em; }
+  .end-actions { padding-left: 44px; }  /* lines up with the chatbot's messages */
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+  /* Narrow screens: the overview sits above the chat and shows only the
+     current dimension, so the messages keep most of the screen. */
+  @media (max-width: 760px) {
+    .body { flex-direction: column; }
+    aside {
+      width: auto; max-height: 30vh; padding: 12px 16px; gap: 8px;
+      border-right: 0; border-bottom: 1px solid var(--line);
+    }
+    aside > div:first-child { display: none; }
+    .dim:not(.active) { display: none; }
+    .dim { padding: 12px; margin-bottom: 0 !important; }
+    .topics { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+  }
   @media (max-width: 640px) {
     header, .composer { padding-left: 16px; padding-right: 16px; }
-    .thread { padding: 24px 16px; }
-    aside { padding: 20px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
+    header { padding-top: 10px; padding-bottom: 10px; }
+    .thread { padding: 20px 16px; }
     .cp-grid { grid-template-columns: 1fr; }
   }
 </style>
@@ -172,7 +192,9 @@
     </aside>
 
     <main>
-      <div class="thread" id="thread" aria-live="polite"></div>
+      <div class="scroller" id="scroller">
+        <div class="thread" id="thread" aria-live="polite"></div>
+      </div>
 
       <div class="composer">
         <form id="composer">
@@ -200,6 +222,7 @@
   let shownDimension = -1;
 
   const thread = document.getElementById('thread');
+  const scroller = document.getElementById('scroller');
   const ta = document.getElementById('reply');
   const sendButton = document.getElementById('sendButton');
   const statusLine = document.getElementById('status');
@@ -254,18 +277,25 @@
     const divider = document.createElement('div');
     divider.className = 'divider mono';
     divider.textContent = `DIMENSION ${i + 1} · ${outline[i].name.toUpperCase()}`;
-    thread.appendChild(divider);
+    show(() => thread.appendChild(divider));
   }
 
-  function scrollDown() { thread.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' }); }
+  // New messages scroll the chat to the bottom, but only if the reader is
+  // already there: someone who scrolled up to reread is not pulled down.
+  function nearBottom() { return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120; }
+  function toBottom() { scroller.scrollTop = scroller.scrollHeight; }
+  function show(change, always = false) {
+    const follow = always || nearBottom();
+    change();
+    if (follow) toBottom();
+  }
 
   function userMsg(text) {
     const msg = document.createElement('div');
     msg.className = 'msg user';
     msg.innerHTML = '<div class="bubble"></div>';
     msg.querySelector('.bubble').textContent = text;
-    thread.appendChild(msg);
-    scrollDown();
+    show(() => thread.appendChild(msg), true);  // the respondent just sent it: always show it
   }
 
   // Adds a chatbot message showing the typing dots; returns a function that fills in the text.
@@ -273,11 +303,10 @@
     const msg = document.createElement('div');
     msg.className = 'msg ai';
     msg.innerHTML = '<div class="avatar mono">AI</div><div class="stack"><div class="bubble"><span class="typing"><span></span><span></span><span></span></span></div></div>';
-    thread.appendChild(msg);
-    scrollDown();
+    show(() => thread.appendChild(msg));
     return {
       element: msg,
-      fill(text) { msg.querySelector('.bubble').textContent = text; scrollDown(); },
+      fill(text) { show(() => { msg.querySelector('.bubble').textContent = text; }); },
     };
   }
 
@@ -301,8 +330,7 @@
     box.querySelector('[data-field="covered"]').textContent = `${check.covered} of ${check.total}`;
     box.querySelector('[data-field="followUpCriteria"]').textContent =
       check.follow_up_criteria.length ? check.follow_up_criteria.join(' / ') : '—';
-    msg.querySelector('.stack').appendChild(box);
-    scrollDown();
+    show(() => msg.querySelector('.stack').appendChild(box));
   }
 
   function setWaiting(waiting) {
@@ -324,11 +352,19 @@
   // The token from the personal link (/?r=<token>); the chatbot only starts with one.
   const respondentToken = new URLSearchParams(location.search).get('r');
 
+  // The conversation is over: no more answers, and the report opens only when
+  // the respondent asks for it. (If the last scores are still being calculated,
+  // result.html waits for them.)
   function finish() {
+    ta.disabled = true;
+    sendButton.disabled = true;
+    ta.placeholder = 'The conversation is finished.';
     reportButton.disabled = false;
-    statusLine.style.color = 'var(--muted)';
-    statusLine.textContent = 'Opening your results…';
-    setTimeout(openReport, 1500);
+    const actions = document.createElement('div');
+    actions.className = 'end-actions';
+    actions.innerHTML = '<button class="btn btn-dark" type="button">View report</button>';
+    actions.querySelector('button').addEventListener('click', openReport);
+    show(() => thread.appendChild(actions), true);
   }
   function openReport() { location.href = '/result.html?id=' + conversationId; }
 
