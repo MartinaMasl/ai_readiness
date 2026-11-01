@@ -1,5 +1,5 @@
 {
-  "version": "0.8",
+  "version": "0.9",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
@@ -10,7 +10,9 @@
     "mixed_evidence": "Choose the level whose description fits the evidence best as a whole. A level fits when the evidence supports its main characteristics and does not contradict it. Do not rule out a level only because the respondent did not mention one of its details: what was not mentioned is unknown, not absent. A level does not fit when the evidence contradicts its description. If the evidence fits two levels equally well, choose the lower one.",
     "plans": "Score the current state. Plans and intentions do not count.",
     "insufficient_evidence": "Set the flag 'insufficient_evidence' when at least one criterion has no evidence, for example because the respondent did not know or the follow-up limit was reached. A criterion that is not applicable does not count as missing evidence. If some criteria have evidence, score on that evidence. If no criterion has evidence, the score is 0.",
-    "not_applicable": "A criterion is not applicable when the condition in its 'not_applicable_if' is met. Do not ask about it, and do not treat it as missing evidence."
+    "not_applicable": "A criterion is not applicable when the condition in its 'not_applicable_if' is met. Do not ask about it, and do not treat it as missing evidence.",
+    "language": "Write questions and replies in plain language that both technical and business respondents understand. Avoid jargon and abbreviations; if a technical term is needed, explain it in a few words. Keep questions short and ask about one thing at a time.",
+    "transitions": "Vary how you move to a new topic. Do not use the same phrase every time, such as 'Turning to'. Use different expressions, for example 'Moving on to', 'Next, let's look at', 'Let's move forward to', 'Now I'd like to ask about', or start with the question itself without a transition phrase."
   },
   "scale": {
     "0": {
@@ -409,6 +411,131 @@
             "3": "AI use cases are identified and evaluated through a documented, organization-wide process using defined criteria such as business value, feasibility, scalability and alignment with strategic objectives. A designated body or role decides which use cases receive investment.",
             "4": "The results of implemented use cases are measured against their expected value, and the use case portfolio is reviewed regularly. Use cases that underperform are adjusted or stopped.",
             "5": "The prioritization process is continuously improved based on results from past use cases and feedback, and new opportunities for AI are identified systematically across the organization."
+          },
+          "examples": []
+        }
+      ]
+    },
+    {
+      "name": "Technology",
+      "definition": "The extent to which an organization's technological environment provides the infrastructure, technological capabilities, and controls required to implement and operate AI applications.",
+      "report_levels": {
+        "0": "Overall, no meaningful technological capability for AI is in place, and the area has not yet been recognized as needing attention.",
+        "1": "Overall, AI is used only with whatever tools and systems individuals happen to have, without control or coordination, so the technical basis for AI is unpredictable and varies across the organization.",
+        "2": "Overall, some teams have the systems, tools and safeguards they need for AI in their own area, but the technical environment, sourcing and controls differ between teams and are not organization-wide.",
+        "3": "Overall, the organization has a documented, organization-wide technical environment for AI, a common approach to obtaining AI technologies, and defined controls for using AI securely and at scale.",
+        "4": "Overall, the infrastructure, vendors and controls used for AI are actively monitored and measured, and problems are identified and addressed.",
+        "5": "Overall, the technical environment for AI is continuously improved based on monitoring, experience and new developments, allowing AI to be used securely and reliably across the organization."
+      },
+      "subdimensions": [
+        {
+          "name": "Infrastructure",
+          "definition": "The extent to which the organization possesses the technological infrastructure and computing capabilities required to develop, deploy, integrate, and operate AI applications, including existing IT systems, computing capacity, connectivity, and the technical environment required to support AI workloads.",
+          "opening_question": "Which systems and online services does your organization use in its daily work, and how well do they work together?",
+          "criteria": [
+            {
+              "id": "environment",
+              "description": "What IT systems the organization works with and where they run.",
+              "look_for": "Cloud services such as Microsoft 365, Google Workspace or Salesforce and what they are used for (from email and file storage only to business applications and data analysis), local systems only, outdated or isolated systems."
+            },
+            {
+              "id": "capacity",
+              "description": "Whether the organization has the computing resources and services needed to run AI.",
+              "look_for": "Access to AI services or platforms provided by the organization, computing or storage capacity for AI work, only public AI tools used in the browser, or no capacity at all."
+            },
+            {
+              "id": "integration",
+              "description": "Whether systems are connected so that AI can be built into processes.",
+              "look_for": "Systems that exchange data automatically or through standard interfaces, systems connected only within some teams, or data moved by hand between separate systems."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether the infrastructure used for AI is monitored and improved.",
+              "look_for": "Monitoring of availability, performance, usage or costs, someone responsible for the environment, and changes made when problems or new needs appear.",
+              "not_applicable_if": "There is no organization-wide technical environment for AI."
+            }
+          ],
+          "levels": {
+            "0": "The infrastructure cannot support any use of AI. Systems are outdated or isolated, no cloud services are used, and the need to prepare the technical environment for AI has not been recognized.",
+            "1": "Individuals use AI with whatever is available, such as public AI tools in the browser, while organizational systems are limited, for example to email and basic file storage. Systems are mostly separate, data is moved between them by hand, and whether an AI tool can be used depends on individual workarounds.",
+            "2": "Some teams have the infrastructure they need for AI in their own area, such as cloud-based collaboration tools, a data analysis platform, or an AI service connected to one system. The infrastructure differs between teams, many systems are not connected, and there is no organization-wide technical environment for AI.",
+            "3": "An organization-wide technical environment for AI is in place and documented. Business systems run largely on a common cloud or on-premise platform, approved AI services or computing capacity are available, and key systems can be connected through standard interfaces. Responsibility for the environment is assigned.",
+            "4": "The infrastructure used for AI is actively monitored, for example for availability, performance, usage and costs. Capacity bottlenecks and integration problems are identified and resolved.",
+            "5": "The infrastructure is continuously improved based on monitoring results and changing AI needs, supported by advanced tooling such as automated deployment and scaling of AI workloads."
+          },
+          "examples": []
+        },
+        {
+          "name": "Technology Sourcing",
+          "definition": "The extent to which the organization has the capability to obtain and integrate the AI technologies required to achieve its objectives, including the evaluation and management of external vendors and decisions on whether AI capabilities should be developed internally, acquired externally, or implemented through a combination of both.",
+          "opening_question": "When your organization needs an AI tool or solution, how do you decide what to use and where to get it from?",
+          "criteria": [
+            {
+              "id": "approach",
+              "description": "How AI tools and solutions are obtained.",
+              "look_for": "Individuals choosing tools themselves, teams buying or building their own solutions, or a common approach that decides whether to build, buy or combine both."
+            },
+            {
+              "id": "evaluation",
+              "description": "Whether AI tools and vendors are assessed before they are used.",
+              "look_for": "No assessment, informal comparison within teams, or defined criteria such as cost, security, data protection and fit with existing systems."
+            },
+            {
+              "id": "management",
+              "description": "Whether licences, contracts and vendor relationships are managed.",
+              "look_for": "A list of approved tools, central management of licences and contracts, someone responsible for vendors, or tools and contracts handled separately by each team or person."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether vendors and AI solutions are monitored and the approach improved.",
+              "look_for": "Tracking of licence use, costs and vendor performance against agreed terms, regular reviews of build-or-buy decisions, and changes made as a result.",
+              "not_applicable_if": "There is no organization-wide approach to obtaining AI technologies."
+            }
+          ],
+          "levels": {
+            "0": "The organization has not obtained any AI technology and has not considered how it would.",
+            "1": "Individuals choose and use AI tools on their own, often free versions, without any evaluation or approval. Whether a tool fits existing systems or is safe to use is not considered.",
+            "2": "Teams or departments buy or build AI solutions for their own needs, sometimes comparing options informally. Decisions about which tools to use, which vendors to work with, and whether to build or buy differ between teams and are not coordinated.",
+            "3": "A documented, organization-wide approach governs how AI technologies are obtained. Tools and vendors are evaluated against defined criteria such as cost, security and compatibility with existing systems, build-or-buy decisions follow a common process, and approved tools and contracts are managed centrally with assigned responsibility.",
+            "4": "Vendors and AI solutions are monitored against agreed terms for performance, cost and contracts, and the use of licences is tracked. Problems with vendors or tools are identified and addressed.",
+            "5": "The sourcing approach is continuously improved based on experience with vendors and solutions and on developments in the market, and build-or-buy decisions are reassessed systematically as needs change."
+          },
+          "examples": []
+        },
+        {
+          "name": "Security and Scalability",
+          "definition": "The extent to which the technological environment can support AI applications securely and at increasing scale, including access control, appropriate management of permissions, model testing and auditing, and the ability to expand AI applications from individual experiments or pilots to broader organizational use.",
+          "opening_question": "How does your organization control which AI tools people can use and what information they can share with them?",
+          "criteria": [
+            {
+              "id": "access",
+              "description": "Whether access to data and AI tools is controlled.",
+              "look_for": "Rules on which AI tools may be used and which data they may access, data classifications (for example public, internal, sensitive), managed permissions, guidance on what not to share, or employees entering sensitive data into any tool."
+            },
+            {
+              "id": "testing",
+              "description": "Whether AI systems and their outputs are tested and checked.",
+              "look_for": "Testing before use, checks of accuracy, fairness or compliance with legal and ethical standards, regular audits, checks only when problems appear, or no testing."
+            },
+            {
+              "id": "scaling",
+              "description": "Whether AI solutions can be expanded from experiments to wider use.",
+              "look_for": "Pilots that stay experiments, solutions extended within one team, or a standard way to move AI solutions into use across the organization."
+            },
+            {
+              "id": "monitoring",
+              "description": "Whether AI systems in use are monitored and the controls improved.",
+              "look_for": "Monitoring of AI systems in operation, detection of access violations or security incidents, review of output quality, and changes made after audits or incidents.",
+              "not_applicable_if": "There are no organization-wide controls for AI use."
+            }
+          ],
+          "levels": {
+            "0": "There are no controls over the use of AI. Employees may enter sensitive or personal data into any AI tool, the risks have not been recognized, and AI has not been used beyond isolated experiments.",
+            "1": "A few individuals are careful with sensitive data on their own initiative, but there are no rules on which AI tools may be used or what data may be shared. AI outputs are not tested, and AI use remains individual experiments.",
+            "2": "Some teams have controls in place, such as access limits or guidance on what not to share, and some AI systems are tested before use, but enforcement is inconsistent across the organization. AI solutions may be extended within a team, but moving a pilot into wider use depends on individual effort.",
+            "3": "Organization-wide rules control which AI tools may be used and which data they may access, based on a documented data classification and managed permissions. AI systems are tested before use, for example for accuracy, fairness and compliance, and a standard process exists for moving AI solutions from pilot to organization-wide use. Responsibilities are assigned.",
+            "4": "AI systems in use are actively monitored and regularly audited, for example for access violations, output quality and compliance. Security incidents and performance problems are detected and addressed, and the use of AI at scale is tracked.",
+            "5": "Security, testing and scaling practices are continuously improved based on audit results, incidents, new threats and changing regulation. Deployment and monitoring are largely automated, allowing AI solutions to scale reliably across the organization."
           },
           "examples": []
         }
