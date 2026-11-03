@@ -1,5 +1,5 @@
 {
-  "version": "0.11",
+  "version": "0.12",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
@@ -63,7 +63,7 @@
       "subdimensions": [
         {
           "name": "Discoverability",
-          "definition": "The extent to which employees can locate the data relevant to their work.",
+          "definition": "The extent to which employees can locate the data relevant to their work, ranging from the absence of a functional mechanism for finding data to a centralized, organization-wide system.",
           "opening_question": "When someone in your organization needs data for their work, how do they find out what data exists and where it is?",
           "criteria": [
             {
@@ -89,8 +89,8 @@
             }
           ],
           "levels": {
-            "0": "There is no functional way, formal or informal, for employees to locate the data required for their work. The need for one has not been recognized.",
-            "1": "Finding data depends on individual initiative and typically involves many inquiries or searching across scattered, disconnected sources. The effort and the outcome are unpredictable and vary significantly depending on who is searching and who is asked.",
+            "0": "Data is very difficult or effectively impossible to find. There is no functional way, formal or informal, for employees to locate the data required for their work. The need for one has not been recognized.",
+            "1": "Locating data requires significant effort, typically involving many inquiries or searching across scattered, disconnected sources. The effort and the outcome are unpredictable and vary significantly depending on who is searching and who is asked.",
             "2": "Data can usually be found through established informal channels, such as asking a colleague known to be knowledgeable about a dataset, or through lists kept by individual teams. This works within teams but is not documented or applied across the organization, and it depends on specific individuals.",
             "3": "Data is located through a documented, organization-wide mechanism, such as a data catalog or central inventory, with standard procedures and clearly defined contact points. Finding data no longer depends on personal knowledge or informal relationships.",
             "4": "The organization-wide system for finding data is actively monitored and measured, for example through its coverage, how current its entries are, and how long employees need to find data. Gaps and outdated entries are identified and corrected, and responsibility for maintaining the system is assigned.",
@@ -126,12 +126,12 @@
             }
           ],
           "levels": {
-            "0": "There is no concept of data ownership within the organization. No individual or team is responsible for any dataset, formally or informally, and the need for ownership has not been recognized.",
+            "0": "There is no concept of data ownership within the organization. No individual or team is responsible for any dataset, formally or informally. The need for ownership has not been recognized.",
             "1": "No one clearly owns the data. Individuals take responsibility on their own initiative, typically only when a problem occurs, so whether a dataset is maintained is unpredictable.",
             "2": "Within teams, it is generally known who owns a given dataset, usually because that person created it or uses it regularly. This ownership is not formally assigned or documented, and approaches differ between teams or departments.",
             "3": "Data ownership is formally assigned and documented across the organization according to one standard. Responsibility for the accuracy, access, and maintenance of each dataset is unambiguous and is tied to roles, not to specific individuals.",
             "4": "Ownership is actively monitored and measured, for example through the share of datasets with an assigned owner and regular reviews of ownership records. Gaps, such as datasets without an owner or owners who have left, are identified and corrected.",
-            "5": "Ownership practices are continuously improved based on monitoring results and feedback from owners and data users. Ownership is built into tools and processes, so that, for example, every new dataset is assigned an owner when it is created."
+            "5": "Ownership practices are continuously improved based on monitoring results and feedback from owners and data users. Ownership is built into tools and processes, so that, for example, every new dataset is automatically assigned an owner when it is created."
           },
           "examples": []
         },
@@ -313,7 +313,7 @@
       "subdimensions": [
         {
           "name": "AI Ambition",
-          "definition": "The extent to which the organization has clearly defined what it intends to achieve through AI and the role AI is expected to play in its future development, whether primarily to optimize existing activities, strengthen its competitive position, or enable broader business transformation.",
+          "definition": "The extent to which the organization has clearly defined what it intends to achieve through AI and the role AI is expected to play in its future development. This includes establishing whether AI is primarily intended to support optimization of existing activities, strengthen the organization's competitive position, or enable broader business transformation.",
           "opening_question": "What does your organization want to achieve with AI, and how was that decided?",
           "criteria": [
             {
@@ -350,7 +350,7 @@
         },
         {
           "name": "Objectives and Alignment",
-          "definition": "The extent to which AI objectives are connected to broader business outcomes and organizational strategy rather than being defined solely through technological performance measures, including alignment among relevant stakeholders such as executive sponsorship and support across organizational departments.",
+          "definition": "The extent to which AI objectives are connected to broader business outcomes and organizational strategy rather than being defined solely through technological performance measures. This also includes alignment among relevant stakeholders, including executive sponsorship and support across organizational departments.",
           "opening_question": "How is AI connected to your organization's business goals, and who in leadership is involved?",
           "criteria": [
             {
@@ -387,7 +387,7 @@
         },
         {
           "name": "Use Case Prioritization",
-          "definition": "The extent to which the organization systematically identifies and prioritizes AI use cases according to their expected business value, feasibility, scalability, and alignment with strategic objectives, rather than pursuing AI applications solely because they are technologically possible.",
+          "definition": "The extent to which the organization systematically identifies and prioritizes AI use cases according to their expected business value, feasibility, scalability, and alignment with strategic objectives. Rather than pursuing AI applications solely because they are technologically possible, the organization evaluates which use cases warrant investment and implementation.",
           "opening_question": "When an idea for using AI comes up in your organization, how is it decided whether to pursue it?",
           "criteria": [
             {
@@ -438,7 +438,7 @@
       "subdimensions": [
         {
           "name": "Infrastructure",
-          "definition": "The extent to which the organization possesses the technological infrastructure and computing capabilities required to develop, deploy, integrate, and operate AI applications, including existing IT systems, computing capacity, connectivity, and the technical environment required to support AI workloads.",
+          "definition": "The extent to which the organization possesses the technological infrastructure and computing capabilities required to develop, deploy, integrate, and operate AI applications. This includes existing IT systems, computing capacity, connectivity, and the technical environment required to support AI workloads.",
           "opening_question": "Which systems and online services does your organization use in its daily work, and how well do they work together?",
           "criteria": [
             {
@@ -475,7 +475,7 @@
         },
         {
           "name": "Technology Sourcing",
-          "definition": "The extent to which the organization has the capability to obtain and integrate the AI technologies required to achieve its objectives, including the evaluation and management of external vendors and decisions on whether AI capabilities should be developed internally, acquired externally, or implemented through a combination of both.",
+          "definition": "The extent to which the organization has the capability to obtain and integrate the AI technologies required to achieve its objectives. This includes the evaluation and management of external vendors and the ability to make appropriate decisions regarding whether AI capabilities should be developed internally, acquired externally, or implemented through a combination of both.",
           "opening_question": "When your organization needs an AI tool or solution, how do you decide what to use and where to get it from?",
           "criteria": [
             {
@@ -512,7 +512,7 @@
         },
         {
           "name": "Security and Scalability",
-          "definition": "The extent to which the technological environment can support AI applications securely and at increasing scale, including access control, appropriate management of permissions, model testing and auditing, and the ability to expand AI applications from individual experiments or pilots to broader organizational use.",
+          "definition": "The extent to which the technological environment can support AI applications securely and at increasing scale. This includes access control, appropriate management of permissions, model testing and auditing, and the ability to expand AI applications from individual experiments or pilots to broader organizational use.",
           "opening_question": "How does your organization control which AI tools people can use and what information they can share with them?",
           "criteria": [
             {

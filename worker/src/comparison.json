@@ -1,0 +1,34 @@
+{
+  "version": "0.1-placeholder",
+  "note": "Layout only. Every question below is a placeholder; the real content will be written by the author.",
+  "sections": [
+    {
+      "id": "chatbot",
+      "title": "About the conversation",
+      "intro": "Think about the assessment you did as a conversation.",
+      "items": [
+        {"id": "C1", "type": "scale", "question": "[Placeholder] The conversation was easy to use.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]},
+        {"id": "C2", "type": "scale", "question": "[Placeholder] The questions were easy to understand.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]}
+      ]
+    },
+    {
+      "id": "questionnaire",
+      "title": "About the questionnaire",
+      "intro": "Think about the assessment you did as a questionnaire.",
+      "items": [
+        {"id": "Q1", "type": "scale", "question": "[Placeholder] The questionnaire was easy to use.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]},
+        {"id": "Q2", "type": "scale", "question": "[Placeholder] The answer options described my organization well.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]}
+      ]
+    },
+    {
+      "id": "compare",
+      "title": "Comparing both",
+      "intro": "Now compare the two formats.",
+      "items": [
+        {"id": "X1", "type": "choice", "question": "[Placeholder] Which format would you prefer to use again?", "options": ["The conversation", "The questionnaire", "No preference"]},
+        {"id": "X2", "type": "choice", "question": "[Placeholder] Which report describes your organization more accurately?", "options": ["The report from the conversation", "The report from the questionnaire", "Both equally", "Neither"]},
+        {"id": "X3", "type": "text", "question": "[Placeholder] Is there anything you would like to add?", "optional": true}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Readiness Questionnaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<style>
+  /* Questionnaire page. Layout and styling from design/questionnaire.html:
+     one question per screen. */
+  :root {
+    --bg: #FFFFFF; --surface: #FFFFFF; --surface-alt: #F7F6FB;
+    --ink: #1C1B33; --ink-soft: #4A4966; --muted: #6B6A85;
+    --line: #E1DFEC; --line-strong: #CBC8DC;
+    --accent: #3D3FB5; --accent-soft: #ECECFB; --accent-ink: #2C2E8F;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+  button { font: inherit; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 28px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
+  .brand-title { font-weight: 600; font-size: 16px; display: block; }
+  .brand-sub { font-size: 13px; color: var(--muted); }
+  .counter { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+  /* Progress: one segment per dimension, one notch per question. */
+  .progress { padding: 18px 28px 0; max-width: 880px; width: 100%; margin: 0 auto; }
+  .segments { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 10px; }
+  .seg-bars { display: grid; grid-template-columns: repeat(var(--q), 1fr); gap: 3px; }
+  .seg-bars span { height: 6px; border-radius: 3px; background: var(--line); transition: background .25s; }
+  .seg-bars span.is-done { background: var(--accent); }
+  .seg-bars span.is-now { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .seg-label { font-size: 12px; color: var(--muted); margin-top: 6px; display: block; }
+  .seg.active .seg-label { color: var(--accent-ink); font-weight: 600; }
+
+  main { flex: 1; display: flex; justify-content: center; padding: 40px 28px 48px; }
+  .card { width: 100%; max-width: 720px; }
+  .card.enter { animation: enter .28s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .card.enter { animation: none; } }
+
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); padding: 4px 12px; border-radius: 999px; }
+  h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 34px; line-height: 1.2; margin: 16px 0 6px; }
+  .hint { margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: 12px; cursor: pointer; background: var(--surface); transition: border-color .15s, background .15s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .mark { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--line-strong); display: grid; place-items: center; transition: all .15s; }
+  .opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .opt:has(input:checked) .mark { border-color: var(--accent); background: var(--accent); }
+  .opt:has(input:checked) .mark::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+  .opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .dk { margin-top: 14px; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: var(--ink-soft); font-size: 15px; padding: 6px 2px; }
+  .dk input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .btn { min-height: 46px; padding: 0 22px; border-radius: 10px; cursor: pointer; font-weight: 500; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); display: inline-flex; align-items: center; gap: 8px; }
+  .btn-primary:hover { background: var(--accent-ink); }
+  .btn-text { border: 0; background: none; color: var(--ink-soft); padding: 0 6px; }
+  .btn-text:hover { color: var(--ink); text-decoration: underline; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .kbd { font-size: 12px; color: var(--muted); }
+
+  .intro, .done { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 24px; }
+  .intro h1, .done h1 { margin: 6px 0 0; }
+  .intro p, .done p { margin: 0; color: var(--ink-soft); max-width: 520px; }
+  .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 8px 0 6px; }
+  .fact { font-size: 14px; color: var(--ink-soft); background: var(--surface-alt); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; }
+  .done-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; }
+  .done-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+  a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .overview-link { font-size: 14px; color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
+  .overview-link:hover { color: var(--ink); text-decoration: underline; }
+  .status { margin-top: 12px; min-height: 1.5em; font-size: 14px; color: #A3410F; }
+
+  @media (max-width: 640px) {
+    header { padding: 10px 16px; }
+    .progress { padding: 14px 16px 0; }
+    .segments { gap: 6px; }
+    .seg-label { font-size: 11px; }
+    main { padding: 24px 16px 32px; }
+    h1 { font-size: 26px; }
+    .kbd { display: none; }
+    .counter .word { display: none; }
+    .brand-sub { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 18 L9 12 L13 15 L20 6"/><circle cx="20" cy="6" r="1.5"/></svg></div>
+      <div><span class="brand-title">AI Readiness Assessment</span><span class="brand-sub">Questionnaire</span></div>
+    </div>
+    <div class="header-right">
+      <span class="counter mono" id="counter"></span>
+      <a class="overview-link" id="overviewLink" href="/">Back to overview</a>
+    </div>
+  </header>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <main><div class="card" id="card"></div></main>
+</div>
+
+<script>
+// The questions come from GET /api/questionnaire (from questionnaire.json,
+// without their scores). Every answer is saved at once; scores are
+// calculated in Python when the respondent finishes.
+const token = new URLSearchParams(location.search).get('r');
+const overviewUrl = '/?r=' + encodeURIComponent(token || '');
+document.getElementById('overviewLink').href = overviewUrl;
+// Closing message, the same as the chatbot's (flow.py CLOSING).
+const CLOSING = 'Thank you, that was the last question. You can now view your report.';
+
+let Q = null;            // {id, position, dimensions, questions, answers, resume_at, done}
+let answers = {};        // question id -> chosen option index
+let pos = -1;            // -1 = intro, 0..n-1 = a question, n = ready to finish
+let finished = false;
+
+async function api(method, url, body) {
+  const response = await fetch(url, {
+    method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(response.status);
+  return response.json();
+}
+
+function renderProgress() {
+  const box = document.getElementById('progress');
+  box.innerHTML = '';
+  if (!Q) return;
+  const seg = document.createElement('div');
+  seg.className = 'segments';
+  seg.style.setProperty('--n', Q.dimensions.length);
+  Q.dimensions.forEach(name => {
+    const items = Q.questions.map((q, i) => ({ q, i })).filter(x => x.q.dimension === name);
+    const el = document.createElement('div');
+    el.className = 'seg' + (Q.questions[pos] && Q.questions[pos].dimension === name ? ' active' : '');
+    const bars = document.createElement('div');
+    bars.className = 'seg-bars';
+    bars.style.setProperty('--q', items.length);
+    items.forEach(x => {
+      const s = document.createElement('span');
+      if (answers[x.q.id] !== undefined && x.i !== pos) s.className = 'is-done';
+      if (x.i === pos) s.className = 'is-now';
+      bars.appendChild(s);
+    });
+    const label = document.createElement('span');
+    label.className = 'seg-label';
+    label.textContent = name;
+    el.append(bars, label);
+    seg.appendChild(el);
+  });
+  box.appendChild(seg);
+  const n = Q.questions.length;
+  document.getElementById('counter').innerHTML =
+    pos >= 0 && pos < n && !finished ? `<span class="word">Question </span>${pos + 1} of ${n}` : '';
+}
+
+function card(html) {
+  const c = document.getElementById('card');
+  c.classList.remove('enter'); void c.offsetWidth; c.classList.add('enter');
+  c.innerHTML = html;
+  return c;
+}
+
+function message(text) {
+  const c = card('<div class="done"><p></p><a class="btn" href="">Back to overview</a></div>');
+  c.querySelector('p').textContent = text;
+  c.querySelector('a').href = overviewUrl;
+}
+
+function render() {
+  renderProgress();
+  window.scrollTo(0, 0);
+  const n = Q.questions.length;
+  if (finished) {
+    const c = card(`<div class="done"><div class="done-icon"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3D3FB5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 L10 17 L19 7"/></svg></div>
+      <h1>Questionnaire complete</h1><p></p>
+      <div class="done-actions"><a class="btn btn-primary" id="report">View report</a><a class="btn" id="back">Back to overview</a></div></div>`);
+    c.querySelector('p').textContent = CLOSING;
+    c.querySelector('#report').href = '/result.html?id=' + encodeURIComponent(Q.id) + '&r=' + encodeURIComponent(token);
+    c.querySelector('#back').href = overviewUrl;
+    return;
+  }
+  if (pos === -1) {
+    const c = card(`<div class="intro"><span class="chip">Assessment ${Q.position} of 2</span>
+      <h1>AI readiness questionnaire</h1>
+      <p>For each question, choose the description that best fits how your organization works today, not what is planned. There are no right or wrong answers.</p>
+      <div class="facts"><span class="fact">${n} questions</span><span class="fact">${Q.dimensions.length} ${Q.dimensions.length === 1 ? 'area' : 'areas'}</span><span class="fact">About 5 minutes</span></div>
+      <button class="btn btn-primary" type="button" id="go">Start the questionnaire</button></div>`);
+    c.querySelector('#go').onclick = () => { pos = 0; render(); };
+    return;
+  }
+  if (pos >= n) {
+    // All questions answered: answers can still be changed until "Finish".
+    const c = card(`<div class="done"><div class="done-icon"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3D3FB5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 L10 17 L19 7"/></svg></div>
+      <h1>All questions answered</h1>
+      <p>You can still review and change your answers. When you finish, your answers are final and your report is prepared.</p>
+      <div class="done-actions"><button class="btn btn-primary" type="button" id="finish">Finish</button>
+      <button class="btn btn-text" type="button" id="review">Review my answers</button></div>
+      <div class="status" id="status"></div></div>`);
+    c.querySelector('#review').onclick = () => { pos = 0; render(); };
+    c.querySelector('#finish').onclick = async () => {
+      c.querySelector('#finish').disabled = true;
+      try {
+        await api('POST', '/api/questionnaire/finish', { respondent: token });
+        finished = true;
+        render();
+      } catch (error) {
+        c.querySelector('#finish').disabled = false;
+        c.querySelector('#status').textContent = 'The questionnaire could not be finished. Please try again.';
+      }
+    };
+    return;
+  }
+
+  const q = Q.questions[pos];
+  const dkIndex = q.options.findIndex(o => o.dont_know);
+  const c = card(`<span class="chip"></span><h1 id="qtitle"></h1>
+    <p class="hint">Choose the description that fits best.</p>
+    <fieldset aria-labelledby="qtitle"><div class="options" id="opts"></div>
+      <label class="dk"><input type="checkbox" id="dk"> I don't know</label></fieldset>
+    <div class="status" id="status"></div>
+    <div class="nav"><button class="btn btn-text" type="button" id="back">← Back</button>
+      <span class="kbd">Press Enter to continue</span>
+      <button class="btn btn-primary" type="button" id="next">${pos === n - 1 ? 'Done' : 'Next'} →</button></div>`);
+  c.querySelector('.chip').textContent = q.dimension;
+  c.querySelector('#qtitle').textContent = q.question;
+  const box = c.querySelector('#opts');
+  const dk = c.querySelector('#dk');
+  q.options.forEach((o, idx) => {
+    if (o.dont_know) return;
+    const label = document.createElement('label');
+    label.className = 'opt';
+    label.innerHTML = '<input type="radio"><span class="mark"></span><span></span>';
+    const input = label.querySelector('input');
+    input.name = q.id; input.value = idx;
+    input.checked = answers[q.id] === idx;
+    label.lastChild.textContent = o.text;
+    input.addEventListener('change', () => { dk.checked = false; choose(q.id, idx); });
+    box.appendChild(label);
+  });
+  dk.checked = answers[q.id] === dkIndex;
+  dk.addEventListener('change', () => {
+    if (dk.checked) { box.querySelectorAll('input').forEach(i => i.checked = false); choose(q.id, dkIndex); }
+    else dk.checked = true;  // an answer can be changed, not removed
+  });
+  const back = c.querySelector('#back');
+  back.disabled = pos === 0;
+  back.onclick = () => { pos--; render(); };
+  c.querySelector('#next').onclick = next;
+  update();
+}
+
+// Saves an answer immediately.
+async function choose(id, option) {
+  answers[id] = option;
+  update();
+  const status = document.getElementById('status');
+  try {
+    await api('POST', '/api/questionnaire/answer', { respondent: token, item: id, option });
+    if (status) status.textContent = '';
+  } catch (error) {
+    if (status) status.textContent = 'Your answer could not be saved. Please choose it again.';
+    delete answers[id];
+    update();
+  }
+}
+
+function update() {
+  const btn = document.getElementById('next');
+  if (btn && Q.questions[pos]) btn.disabled = answers[Q.questions[pos].id] === undefined;
+  renderProgress();
+}
+function next() {
+  if (finished || pos < 0 || pos >= Q.questions.length || answers[Q.questions[pos].id] === undefined) return;
+  pos++; render();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && Q && !finished && pos >= 0 && pos < Q.questions.length) next();
+});
+
+async function load() {
+  if (!token) { message('This study can only be opened with your personal link. Please use the link you received.'); return; }
+  try {
+    await api('POST', '/api/questionnaire/start', { respondent: token });
+    Q = await api('GET', '/api/questionnaire?r=' + encodeURIComponent(token));
+  } catch (error) {
+    message(error.message === '403' ? 'This link is not valid. Please use the personal link you received.'
+      : error.message === '409' ? 'This assessment is not available yet. Please go back to the overview.'
+      : 'The questionnaire could not be loaded. Please reload the page.');
+    return;
+  }
+  answers = Q.answers;
+  finished = Q.done;
+  // "Continue": straight to the first unanswered question (or to Finish).
+  pos = Object.keys(answers).length ? Q.resume_at : -1;
+  render();
+}
+load();
+</script>
+</body>
+</html>

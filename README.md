@@ -1,20 +1,22 @@
-# AI readiness assessment chatbot
+# AI readiness assessment: chatbot and questionnaire
 
 The practical part of a diploma thesis. The thesis defines a methodology for
 assessing an organization's AI readiness and applies it in two formats, a
-chatbot and a questionnaire, which are then compared. This repository holds the
-chatbot. The questionnaire will be added later, reusing the same rubric,
-scoring code and report.
+chatbot and a questionnaire, which are then compared. This repository holds
+both formats, run as one study: every respondent does both assessments, sees
+a report after each, then compares the two reports and answers a short
+comparison questionnaire. Both formats use the same rubric, scoring code and
+report.
 
-This document describes the architecture of the chatbot: what each part does,
-how a conversation runs, where data is stored, and why it was built this way.
+This document describes the architecture: the study (section 2a), how the
+chatbot works, where data is stored, and why it was built this way.
 Every design decision, with its date and reason, is recorded in
 [`DECISIONS.md`](DECISIONS.md).
 
 ## Contents
 
 1. [The methodology in short](#1-the-methodology-in-short)
-2. [Overview](#2-overview)
+2. [Overview](#2-overview) and [the study](#2a-the-study)
 3. [Who does what: code and language model](#3-who-does-what-code-and-language-model)
 4. [How a conversation runs](#4-how-a-conversation-runs)
 5. [The two model calls](#5-the-two-model-calls)
@@ -76,6 +78,52 @@ Every design decision, with its date and reason, is recorded in
 
 The static pages in `worker/public/` are served directly by Cloudflare;
 every request under `/api` goes to the Python application.
+
+## 2a. The study
+
+Every respondent gets one personal link (`/?r=<token>`, no login; the token
+identifies them). The rules are plain functions in
+[`study.py`](worker/src/study.py); the pages follow the author's designs in
+[`design/`](design/).
+
+```
+home page (consent) ─► assessment 1 ─► its report ─► home ─► assessment 2 ─► its report
+                         (order from format_order)                                │
+home ◄── comparison questionnaire ◄── compare page (both reports) ◄───────────────┘
+```
+
+| Page | What it does |
+|---|---|
+| Home (`index.html`) | consent (stores `consent_at`), then three steps in the respondent's order: first assessment, second assessment, "Compare and give feedback", each with its status: not started, in progress (Continue), completed (date; opens that assessment's report), or locked with the reason |
+| Chatbot (`chat.html`) | the conversation (sections 3 to 5); continues where the respondent left off |
+| Questionnaire (`questionnaire.html`) | one multiple-choice question per subdimension, one per screen; every answer saved at once; answers can be changed until Finish |
+| Report (`result.html`) | one assessment's own report, headed "Report from the conversation" or "Report from the questionnaire" with its date |
+| Compare (`compare.html`) | both reports (each the real report page in an iframe), side by side or as two tabs on a phone |
+| Feedback (`feedback.html`) | the comparison questionnaire; its content comes only from `comparison.json` |
+
+Rules:
+- **Order.** `format_order` ("chatbot_first" or "questionnaire_first") is set
+  when the link is created, alternating within each role (technical,
+  business), so both orders are used about equally and the order effect can
+  be balanced out. The comparison questionnaire asks about the two formats in
+  the order the respondent did them.
+- **Unlocking.** Nothing before consent; the second assessment after the first
+  is finished; the comparison after both. The server enforces this too.
+- **One assessment per format.** A respondent has at most one counting
+  chatbot conversation and one questionnaire (unique index in the database);
+  "Continue" resumes it; a finished assessment is final.
+- **Nothing is deleted.** A test respondent is reset by marking their rows
+  `excluded`.
+- **Same scoring for both formats.** The questionnaire's chosen option is the
+  subdimension score ("I don't know": 0 with the flag `insufficient_evidence`);
+  its results are saved in the same form as the chatbot's, so dimension and
+  overall scores and the report come from the same code. Each report reads
+  only its own assessment's scores (tested).
+- **What is measured for the analysis.** Whether the first report was opened
+  before the second assessment (`first_report_viewed_at`), the time per
+  assessment and per dimension (chatbot: message timestamps; questionnaire:
+  time each question was first answered), and every comparison answer with
+  the version of the content it was given for.
 
 ## 3. Who does what: code and language model
 
@@ -241,7 +289,8 @@ From the check prompt (decided by the author):
 
 ### 6.1 Tables
 
-Four tables in Cloudflare D1. `logs` and `subdimension_results` are connected
+Five tables in Cloudflare D1 (`comparison_responses` holds the comparison
+questionnaire's answers with the content version). `logs` and `subdimension_results` are connected
 to `conversations` by the conversation id, and `conversations` to
 `respondents` by the respondent code (foreign keys). Each table has exactly
 one kind of writer, so a background score and the next answer can never
@@ -250,7 +299,7 @@ overwrite each other. Every table and column is explained in the SQL files in
 
 | Table | One row per | Contains | Written by |
 |---|---|---|---|
-| `respondents` | invited person | pseudonymous code (e.g. R01), role (`technical` or `business`), token of the personal link | the author, with `add_respondent.py` |
+| `respondents` | invited person | pseudonymous code (e.g. R01), role (`technical` or `business`), token of the personal link, `format_order`, `consent_at`, `feedback_submitted_at` | the author, with `add_respondent.py`; consent and submission by the respondent |
 | `conversations` | conversation | the respondent's code, and the state as JSON: current subdimension, counters, transcript, checks of the current subdimension, finished subdimensions, done | every answer request |
 | `logs` | conversation | the log header as JSON: id, start time, model id and settings, rubric version, prompt versions | the start of the conversation |
 | `subdimension_results` | scored subdimension | the level (for the report) and the log entry as JSON | the background score |
@@ -398,9 +447,18 @@ worker/
   wrangler.jsonc              Cloudflare configuration: Worker, D1 database, settings, static files
   pyproject.toml              Python packages
   migrations/                 SQL that creates the database tables
-  public/index.html           chat page
+  public/index.html           home page of the study
+  public/chat.html            chat page
+  public/questionnaire.html   questionnaire page
+  public/compare.html         both reports side by side
+  public/feedback.html        comparison questionnaire
   public/result.html          report page
   src/main.py                 the API endpoints, background scoring
+  src/study.py                the study's rules: status and unlocking of the three steps
+  src/questionnaire.py        loads and checks the questionnaire, scores its answers
+  src/questionnaire.json      the questionnaire (by the author)
+  src/comparison.py           loads and checks the comparison questionnaire
+  src/comparison.json         the comparison questionnaire's content (by the author)
   src/flow.py                 the conversation flow, one step per request
   src/llm.py                  prompts, the two model calls, checks on the model's answers
   src/prompts/check.md        check prompt (versioned in its first line)
@@ -418,6 +476,7 @@ worker/
   scripts/export_scores.py    scores, times and metrics as CSV, for the analysis per respondent and role
   src/timing.py               time per conversation, dimension and subdimension (from message timestamps)
   scripts/rescore.py          scores saved conversations again, to compare rule and prompt versions
+design/                       the author's design references for the study pages
 DECISIONS.md                  every design decision with date and reason
 claude.md                     the project specification
 ```
@@ -466,4 +525,5 @@ uv run pywrangler deploy
   conversation is linked to that respondent's pseudonymous code and role
   (technical or business). Names are never stored; the author keeps the list
   connecting codes to names outside the database and this repository.
-- A consent screen is planned.
+- Consent is asked on the home page before the first assessment (text still a
+  placeholder) and stored with its time.

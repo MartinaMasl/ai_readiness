@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Readiness Feedback</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<style>
+  /* Comparison questionnaire. Layout and styling from design/comparison.html:
+     one section per screen. The content comes from comparison.json. */
+  :root {
+    --bg: #F7F6FB; --surface: #FFFFFF; --surface-alt: #FBFAFE;
+    --ink: #1C1B33; --ink-soft: #4A4966; --muted: #6B6A85;
+    --line: #E1DFEC; --line-strong: #CBC8DC;
+    --accent: #3D3FB5; --accent-soft: #ECECFB; --accent-ink: #2C2E8F;
+    --open: #A3410F; --open-soft: #FCEFE6;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5; }
+  button, textarea { font: inherit; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
+  .brand-title { font-weight: 600; font-size: 16px; display: block; }
+  .brand-sub { font-size: 13px; color: var(--muted); }
+  .counter { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+
+  main { max-width: 760px; margin: 0 auto; padding: 36px 28px 56px; display: flex; flex-direction: column; gap: 22px; }
+  .steps { display: flex; gap: 8px; }
+  .steps span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+  .steps span.is-done { background: var(--accent); }
+  .steps span.is-now { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 32px; line-height: 1.15; margin: 4px 0 6px; }
+  .intro { margin: 0; color: var(--ink-soft); }
+
+  .item { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .item legend, .item .label { float: left; width: 100%; padding: 0; font-weight: 600; font-size: 16px; margin-bottom: 14px; }
+  .item legend + * , .item .label + * { clear: both; }
+  .optional { font-weight: 400; color: var(--muted); font-size: 14px; }
+
+  .scale { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 8px; }
+  .scale label { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-size: 13px; color: var(--ink-soft); padding: 12px 6px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+  .scale label:hover, .choices label:hover { border-color: var(--line-strong); background: var(--surface-alt); }
+  .scale input, .choices input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+  .scale label:has(input:checked), .choices label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); color: var(--ink); }
+
+  .choices { display: flex; flex-direction: column; gap: 8px; }
+  .choices label { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+
+  textarea { width: 100%; min-height: 110px; resize: vertical; border-radius: 12px; border: 1px solid var(--line-strong); padding: 12px 14px; color: var(--ink); background: var(--surface); }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px; }
+  .btn { min-height: 46px; padding: 0 22px; border-radius: 10px; cursor: pointer; font-weight: 500; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-ink); }
+  .btn-text { border: 0; background: none; color: var(--ink-soft); padding: 0 6px; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .nav-note { font-size: 13px; color: var(--muted); }
+
+  .done { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 40px; }
+  .done-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; }
+  .done p { margin: 0; color: var(--ink-soft); max-width: 480px; }
+  a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .overview-link { font-size: 14px; color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
+  .overview-link:hover { color: var(--ink); text-decoration: underline; }
+  .status { min-height: 1.5em; font-size: 14px; color: var(--open); }
+  .error { color: var(--open); }
+
+  @media (max-width: 640px) {
+    header { padding: 10px 16px; }
+    .brand-sub { display: none; }
+    main { padding: 24px 16px 40px; }
+    h1 { font-size: 26px; }
+    .item { padding: 16px; }
+    .scale { grid-template-columns: 1fr; }
+    .scale label { flex-direction: row; justify-content: flex-start; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 18 L9 12 L13 15 L20 6"/><circle cx="20" cy="6" r="1.5"/></svg></div>
+    <div><span class="brand-title">AI Readiness Assessment</span><span class="brand-sub">Feedback on the two formats</span></div>
+  </div>
+  <div class="header-right">
+    <span class="counter mono" id="counter"></span>
+    <a class="overview-link" id="overviewLink" href="/">Back to overview</a>
+  </div>
+</header>
+<main id="main"></main>
+
+<script>
+// The sections come from GET /api/comparison: the content of comparison.json,
+// with the sections about the two formats in the order the respondent did
+// them. Each section is saved when the respondent goes on.
+const token = new URLSearchParams(location.search).get('r');
+const overviewUrl = '/?r=' + encodeURIComponent(token || '');
+document.getElementById('overviewLink').href = overviewUrl;
+
+let C = null;          // {version, sections, answers, resume_at, submitted}
+let answers = {};      // question id -> option index or text
+let pos = 0;           // index of the section shown; sections.length = done
+let submitted = false;
+
+async function api(method, url, body) {
+  const response = await fetch(url, {
+    method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(response.status);
+  return response.json();
+}
+
+function isAnswered(item) {
+  if (item.optional) return true;
+  const v = answers[item.id];
+  return v !== undefined && v !== null && String(v).trim() !== '';
+}
+
+function fail(text) {
+  const main = document.getElementById('main');
+  main.innerHTML = '<p class="error"></p><div><a class="btn" href="">Back to overview</a></div>';
+  main.querySelector('p').textContent = text;
+  main.querySelector('a').href = overviewUrl;
+}
+
+function render() {
+  const main = document.getElementById('main');
+  window.scrollTo(0, 0);
+  if (submitted) {
+    document.getElementById('counter').textContent = '';
+    main.innerHTML = `<div class="done"><div class="done-icon"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3D3FB5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 L10 17 L19 7"/></svg></div>
+      <h1>Thank you</h1><p>Your feedback is saved. You have completed every part of the study.</p>
+      <a class="btn btn-primary" href="">Back to overview</a></div>`;
+    main.querySelector('a').href = overviewUrl;
+    return;
+  }
+  const sec = C.sections[pos];
+  const last = pos === C.sections.length - 1;
+  document.getElementById('counter').textContent = `Part ${pos + 1} of ${C.sections.length}`;
+  main.innerHTML = '';
+
+  const steps = document.createElement('div');
+  steps.className = 'steps';
+  C.sections.forEach((_, i) => { const s = document.createElement('span'); if (i < pos) s.className = 'is-done'; if (i === pos) s.className = 'is-now'; steps.appendChild(s); });
+  main.appendChild(steps);
+
+  const head = document.createElement('div');
+  head.innerHTML = '<span class="eyebrow mono">Feedback</span><h1></h1><p class="intro"></p>';
+  head.querySelector('h1').textContent = sec.title;
+  head.querySelector('.intro').textContent = sec.intro || '';
+  main.appendChild(head);
+
+  sec.items.forEach(item => {
+    const box = document.createElement('div');
+    box.className = 'item';
+    if (item.type === 'text') {
+      const id = 'f_' + item.id;
+      box.innerHTML = `<label class="label" for="${id}"></label><textarea id="${id}" maxlength="5000"></textarea>`;
+      box.querySelector('label').textContent = item.question;
+      if (item.optional) box.querySelector('label').insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
+      const ta = box.querySelector('textarea');
+      ta.value = answers[item.id] || '';
+      ta.addEventListener('input', () => { answers[item.id] = ta.value; update(); });
+    } else {
+      const fs = document.createElement('fieldset');
+      const lg = document.createElement('legend');
+      lg.textContent = item.question;
+      if (item.optional) lg.insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
+      fs.appendChild(lg);
+      const wrap = document.createElement('div');
+      const values = item.type === 'scale' ? item.scale : item.options;
+      wrap.className = item.type === 'scale' ? 'scale' : 'choices';
+      if (item.type === 'scale') wrap.style.setProperty('--n', values.length);
+      values.forEach((text, idx) => {
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'radio'; input.name = item.id; input.value = idx;
+        input.checked = answers[item.id] === idx;
+        input.addEventListener('change', () => { answers[item.id] = idx; update(); });
+        const span = document.createElement('span');
+        span.textContent = text;
+        label.append(input, span);
+        wrap.appendChild(label);
+      });
+      fs.appendChild(wrap);
+      box.appendChild(fs);
+    }
+    main.appendChild(box);
+  });
+
+  const nav = document.createElement('div');
+  nav.className = 'nav';
+  nav.innerHTML = `<button class="btn btn-text" type="button" id="back">← Back</button><span class="nav-note" id="note"></span><button class="btn btn-primary" type="button" id="next">${last ? 'Submit' : 'Next →'}</button>`;
+  main.appendChild(nav);
+  const status = document.createElement('div');
+  status.className = 'status'; status.id = 'status';
+  main.appendChild(status);
+  nav.querySelector('#back').disabled = pos === 0;
+  nav.querySelector('#back').onclick = () => { pos--; render(); };
+  nav.querySelector('#next').onclick = () => saveAndGo(sec, last);
+  update();
+}
+
+// Saves the section, then shows the next one (or submits after the last).
+async function saveAndGo(sec, last) {
+  const next = document.getElementById('next');
+  next.disabled = true;
+  const sectionAnswers = {};
+  sec.items.forEach(item => { sectionAnswers[item.id] = answers[item.id] === undefined ? null : answers[item.id]; });
+  try {
+    await api('POST', '/api/comparison/section', { respondent: token, section: sec.id, answers: sectionAnswers });
+    if (last) {
+      await api('POST', '/api/comparison/submit', { respondent: token });
+      submitted = true;
+    } else {
+      pos++;
+    }
+    render();
+  } catch (error) {
+    next.disabled = false;
+    document.getElementById('status').textContent = 'Your answers could not be saved. Please try again.';
+  }
+}
+
+function update() {
+  const sec = C.sections[pos];
+  const left = sec.items.filter(i => !isAnswered(i)).length;
+  const next = document.getElementById('next');
+  if (!next) return;
+  next.disabled = left > 0;
+  document.getElementById('note').textContent = left ? `${left} question${left === 1 ? '' : 's'} left` : '';
+}
+
+async function load() {
+  if (!token) { fail('This study can only be opened with your personal link. Please use the link you received.'); return; }
+  try {
+    C = await api('GET', '/api/comparison?r=' + encodeURIComponent(token));
+  } catch (error) {
+    fail(error.message === '403' ? 'This link is not valid. Please use the personal link you received.'
+      : error.message === '409' ? 'The feedback is available after both assessments are finished.'
+      : 'The feedback could not be loaded. Please reload the page.');
+    return;
+  }
+  answers = C.answers;
+  submitted = C.submitted;
+  // "Continue": the first section that is not complete (the last one if all are).
+  pos = Math.min(C.resume_at, C.sections.length - 1);
+  render();
+}
+load();
+</script>
+</body>
+</html>

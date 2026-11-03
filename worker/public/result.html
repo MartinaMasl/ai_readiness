@@ -2262,16 +2262,26 @@ body[data-not-sent] > #vis-container ~ #not-sent {
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }</style><style>body { padding: 16px; background: var(--surface-1); }
-#vis-container { overflow: visible; }</style></head><body><svg style="position:absolute;width:0;height:0" aria-hidden="true">
+#vis-container { overflow: visible; }
+/* Narrow screens: the radar chart above the overall score, so the text keeps its width. */
+@media (max-width: 640px) { .report-top { grid-template-columns: 1fr !important; } }</style></head><body><svg style="position:absolute;width:0;height:0" aria-hidden="true">
     <defs>
       <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
         <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
       </marker>
     </defs>
   </svg><div id="vis-container"><h2 class="sr-only">AI readiness assessment result: a radar chart of the dimension scores, the overall readiness score, and a card per dimension with its score, level and the meaning of that level.</h2>
+<!-- Which assessment this report belongs to (filled from the report data). -->
+<div id="reportHeading" hidden><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;padding:0 0 1rem;border-bottom:0.5px solid var(--border);margin-bottom:1rem;">
+  <div>
+    <div id="reportTitle" style="font-family:var(--font-voice);font-size:28px;line-height:1.2;color:var(--text-primary);"></div>
+    <div id="reportDate" style="font-size:13px;color:var(--text-secondary);margin-top:4px;"></div>
+  </div>
+  <a id="overviewLink" hidden style="font-size:14px;color:var(--text-primary);text-decoration:none;border:0.5px solid var(--border);border-radius:8px;padding:8px 14px;">Back to overview</a>
+</div></div>
 <div id="reportError" hidden style="font-size:14px;color:var(--text-secondary);padding:1rem 0;"></div>
 <div id="report" hidden>
-<div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:center;padding:0.5rem 0 1rem;">
+<div class="report-top" style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:center;padding:0.5rem 0 1rem;">
   <div style="position:relative;width:100%;height:300px;">
     <canvas id="readinessRadar2" role="img"></canvas>
   </div>
@@ -2375,14 +2385,35 @@ function showError(message) {
   box.hidden = false;
 }
 
+var TITLES = { chatbot: 'Report from the conversation', questionnaire: 'Report from the questionnaire' };
+
+function showHeading(assessment) {
+  if (!assessment) return;  // the demo reports have no assessment
+  document.getElementById('reportTitle').textContent = TITLES[assessment.format];
+  if (assessment.finished_at) {
+    document.getElementById('reportDate').textContent = 'Completed on ' +
+      new Date(assessment.finished_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  document.getElementById('reportHeading').hidden = false;
+}
+
 (async function(){
-  var id = new URLSearchParams(location.search).get('id');
+  var params = new URLSearchParams(location.search);
+  var id = params.get('id');
+  // embed=1: shown inside the compare page, which has its own headings and
+  // does not count as viewing the report.
+  var embedded = params.get('embed') === '1';
+  if (params.get('r') && !embedded) {
+    var link = document.getElementById('overviewLink');
+    link.href = '/?r=' + encodeURIComponent(params.get('r'));
+    link.hidden = false;
+  }
   if (!id) { showError('No conversation id in the address.'); return; }
   try {
     // 202 means the last scores are still being calculated: ask again every 3 seconds.
     var response;
     for (var attempt = 0; attempt < 40; attempt++) {
-      response = await fetch('/api/conversations/' + encodeURIComponent(id) + '/report');
+      response = await fetch('/api/conversations/' + encodeURIComponent(id) + '/report' + (embedded ? '' : '?view=1'));
       if (response.status !== 202) break;
       showError('Your results are being prepared…');
       await new Promise(function(resolve){ setTimeout(resolve, 3000); });
@@ -2390,6 +2421,7 @@ function showError(message) {
     if (!response.ok || response.status === 202) { showError('The report could not be loaded (' + response.status + ').'); return; }
     document.getElementById('reportError').hidden = true;
     var report = await response.json();
+    if (!embedded) showHeading(report.assessment);
 
     document.getElementById('overallScore').textContent = report.overall.score_display;
     document.getElementById('overallLevel').textContent = levelText(report.overall.level);

@@ -5,8 +5,10 @@
 This is the practical part of a diploma thesis. The thesis defines a
 methodology for assessing an organization's AI readiness and applies it
 in two formats, a chatbot and a questionnaire, which are later compared.
-This repository builds the chatbot first. The questionnaire will be added
-later and must reuse the same rubric file, scoring code and report.
+Both formats are built here and run as one study (see "The study"):
+each respondent does both assessments, sees a report after each, then
+compares the two reports and answers a short comparison questionnaire.
+The questionnaire reuses the same rubric file, scoring code and report.
 
 The author has to describe and defend every component in the thesis.
 Prefer simple, explicit code she can explain over clever abstractions.
@@ -165,9 +167,66 @@ If `result.html` shows something this list does not cover, or leaves out
 something this list requires, do not decide yourself. Tell the author
 what differs and ask.
 
+## The study
+
+One personal link per respondent (`/?r=<token>`), no login: the token
+identifies the respondent. The link opens the home page; an unknown token
+shows only a short error. The rules are in `worker/src/study.py`.
+
+1. Home page (`worker/public/index.html`, design: `design/home.html`):
+   a consent box with placeholder text (stores `consent_at`), then three
+   steps in the respondent's `format_order` ("chatbot_first" or
+   "questionnaire_first", alternated within each role): first
+   assessment, second assessment, "Compare and give feedback". Each step
+   shows its status from the database: not started (Start), in progress
+   (Continue), completed (date; the card and "View report" open that
+   assessment's own report), or locked with the reason.
+2. Unlocking: nothing before consent; the second assessment after the
+   first is finished; "Compare and give feedback" after both. The server
+   enforces this too (409).
+3. Each respondent has at most one counting assessment per format (a
+   `conversations` row with `format` and `excluded = 0`); "Continue"
+   resumes it. A finished assessment is final. Nothing is ever deleted:
+   a test respondent (code "T…") is reset with `add_respondent.py
+   --reset`, which marks their rows `excluded`.
+4. Chatbot (`chat.html`) and questionnaire (`questionnaire.html`, design:
+   `design/questionnaire.html`) both end with the closing message, "View
+   report" and "Back to overview".
+5. Report (`result.html?id=<id>&r=<token>`): one assessment's own scores
+   only, with the heading "Report from the conversation" or "Report from
+   the questionnaire" and the completion date. The first time the report
+   page is opened, `first_report_viewed_at` is stored.
+6. Compare page (`compare.html`): both reports, each `result.html` in an
+   iframe with `embed=1` (no heading, does not count as viewed), grown to
+   its full height; side by side, as two tabs on a phone; then
+   "Continue to feedback".
+7. Comparison questionnaire (`feedback.html`, design:
+   `design/comparison.html`): content only from `worker/src/comparison.json`
+   (checked when the Worker starts); the sections about the two formats
+   in the order the respondent did them; saved per section with the
+   file's version (`content_version`); Submit sets
+   `feedback_submitted_at`, and the home page shows the study as complete.
+
+## The questionnaire
+
+`worker/src/questionnaire.json` (by the author) has one multiple-choice
+question per subdimension, checked against the rubric when the Worker
+starts (`questionnaire.py`). The chosen option's value is the
+subdimension score; "I don't know" scores 0 and sets
+`insufficient_evidence`. One question per screen; every answer is saved
+at once (with the time it was first given); "Continue" resumes at the
+first unanswered question; answers can be changed ("Review my answers")
+until Finish. Finish writes one `subdimension_results` row per
+subdimension in the same form as the chatbot's, so the same scoring and
+report code is used, and adds the raw answers to the log. The page never
+receives the options' values. `DIMENSIONS` limits the questions like the
+chatbot's topics.
+
 ## The chat page
 
-`worker/public/index.html` is the chat interface, shown at `/`. It is a
+`worker/public/chat.html` is the chat interface, opened from the home
+page. If the respondent already has a conversation, it shows the earlier
+messages and continues it. It is a
 plain HTML page in the same style as the report: a message list, a text
 box and a send button, with a little JavaScript that calls the API.
 The page itself never scrolls: the header, the dimension overview on the
@@ -197,15 +256,29 @@ list is stored in the conversation state when it starts.
 
 All endpoints are under `/api`, in FastAPI (`worker/src/main.py`):
 
-- `POST /api/conversations`: starts a conversation. Takes the token from
-  the respondent's personal link (`{"respondent": "<token>"}`); without a
-  valid token it answers 403. Returns the conversation id, the intro
-  message and the first `opening_question`.
+Every endpoint that belongs to a respondent takes the token from their
+personal link (`r` or `{"respondent": "<token>"}`) and answers 403 for an
+unknown token.
+
+- `GET /api/study`: the home page: consent, the three steps with their
+  status, the number of topics. `POST /api/study/consent`: give consent.
+- `POST /api/conversations`: starts the respondent's chatbot
+  conversation or returns the one they have (409 if the step is locked).
+  `GET /api/conversations/{id}?r=`: the conversation so far, to continue.
 - `POST /api/conversations/{id}/answer`: takes the respondent's answer,
   runs the next step of the flow and returns the next chatbot message,
   or `done: true` when everything is scored.
-- `GET /api/conversations/{id}/report`: returns the report data as JSON,
-  or 202 while the last scores are still being calculated.
+- `GET /api/conversations/{id}/report`: returns the report data of one
+  assessment (chatbot or questionnaire) as JSON, with `assessment`
+  (format, completion date), or 202 while the last scores are still
+  being calculated. `view=1` (the report page itself) stores
+  `first_report_viewed_at` the first time.
+- `POST /api/questionnaire/start`, `GET /api/questionnaire?r=`,
+  `POST /api/questionnaire/answer`, `POST /api/questionnaire/finish`:
+  the questionnaire (start or return, questions and answers so far, save
+  one answer, finish and score).
+- `GET /api/comparison?r=`, `POST /api/comparison/section`,
+  `POST /api/comparison/submit`: the comparison questionnaire.
 
 ## The conversation log
 
@@ -272,7 +345,9 @@ chatbot never reads the log back.
 
 ## The database tables
 
-D1 has four tables. `logs` and `subdimension_results` are connected to
+D1 has five tables (the fifth, `comparison_responses`, holds the
+comparison questionnaire's answers with the content version). `logs` and
+`subdimension_results` are connected to
 `conversations` by the conversation id, and `conversations` to
 `respondents` by the respondent code (foreign keys). They are created by
 `worker/migrations/`, where every table and column is explained, and read
@@ -282,13 +357,16 @@ other.
 
 - `respondents`: one row per invited person: a pseudonymous code
   (e.g. R01), the role (`technical` or `business`, set by the author) and
-  the token of their personal link. Created by the author with
+  the token of their personal link, plus `format_order`, `consent_at`
+  and `feedback_submitted_at`. Created by the author with
   `worker/scripts/add_respondent.py`. Names are never stored; the author
   keeps the list connecting codes to names outside the database and the
   repository. `conversations.respondent_code` says whose link started a
   conversation; the code and role are also in the log header.
 
-- `conversations`: the chatbot's working memory, so the flow can
+- `conversations`: one row per assessment (`format` chatbot or
+  questionnaire, `finished_at`, `first_report_viewed_at`, `excluded`).
+  For the chatbot it is the working memory, so the flow can
   continue. Workers forget everything between requests, so every answer
   request loads this state, does one step and saves it again. It holds
   only what the next step needs: current subdimension, the counters,
@@ -342,10 +420,20 @@ affect a running conversation.
 ```
 worker/wrangler.jsonc        Cloudflare settings
 worker/pyproject.toml        Python packages for the Worker
-worker/public/index.html     chat page, shown at /
+worker/public/index.html     home page of the study, shown at /?r=<token>
+worker/public/chat.html      chat page
+worker/public/questionnaire.html  questionnaire page
+worker/public/compare.html   both reports side by side
+worker/public/feedback.html  comparison questionnaire
+design/                      the author's design references for the study pages
 worker/public/result.html    report design by the author, filled with data
 worker/src/main.py           FastAPI app, the /api endpoints
 worker/src/rubric.json       the rubric (inside src/ so the Worker can read it)
+worker/src/questionnaire.json  the questionnaire (by the author)
+worker/src/comparison.json   the comparison questionnaire's content (by the author)
+worker/src/study.py          the study's rules: status and unlocking of the steps
+worker/src/questionnaire.py  loads the questionnaire, scores answers
+worker/src/comparison.py     loads and checks the comparison content
 worker/src/prompts/check.md  check prompt, versioned in its first line
 worker/src/prompts/score.md  scoring prompt, versioned in its first line
 worker/src/rubric.py         loads and validates the rubric file
@@ -386,8 +474,11 @@ test what you built, and wait for the author before starting the next.
 5. The real model calls in the flow, replacing the fake chatbot.
 6. The other three dimensions in the rubric file (the author writes
    these).
-7. Rest of deployment: personal links (done), a consent screen.
-8. Pilot conversations and prompt refinement.
+7. Rest of deployment: personal links (done), a consent screen (done,
+   placeholder text).
+8. The study (done): home page, questionnaire, a report after each
+   assessment, compare page, comparison questionnaire.
+9. Pilot conversations and prompt refinement.
 
 Tests for step 2 must include this worked example from the thesis:
 
@@ -403,9 +494,9 @@ Overall score 2.58, level 2. Also test a subdimension with no evidence
 
 ## Not in scope until the author asks
 
-Login, resuming a conversation, a summary the respondent confirms, the
-questionnaire, fine-tuning, and any extra model call beyond check and
-score. (Hosting and the D1 database are in scope, because the app runs
+Login, a summary the respondent confirms, fine-tuning, and any extra
+model call beyond check and score. (The questionnaire and resuming an
+assessment are now in scope, as part of the study.) (Hosting and the D1 database are in scope, because the app runs
 on Cloudflare Workers.)
 
 ## Decision log

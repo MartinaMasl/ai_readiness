@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Readiness Questionnaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+<style>
+  /* Same brand tokens as the chat page; a different layout: one question per screen. */
+  :root {
+    --bg: #FFFFFF; --surface: #FFFFFF; --surface-alt: #F7F6FB;
+    --ink: #1C1B33; --ink-soft: #4A4966; --muted: #6B6A85;
+    --line: #E1DFEC; --line-strong: #CBC8DC;
+    --accent: #3D3FB5; --accent-soft: #ECECFB; --accent-ink: #2C2E8F;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+  button { font: inherit; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 28px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 36px; height: 36px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
+  .brand-title { font-weight: 600; font-size: 16px; display: block; }
+  .brand-sub { font-size: 13px; color: var(--muted); }
+  .counter { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+  /* Progress: one segment per dimension, one notch per question. */
+  .progress { padding: 18px 28px 0; max-width: 880px; width: 100%; margin: 0 auto; }
+  .segments { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 10px; }
+  .seg-bars { display: grid; grid-template-columns: repeat(var(--q), 1fr); gap: 3px; }
+  .seg-bars span { height: 6px; border-radius: 3px; background: var(--line); transition: background .25s; }
+  .seg-bars span.is-done { background: var(--accent); }
+  .seg-bars span.is-now { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .seg-label { font-size: 12px; color: var(--muted); margin-top: 6px; display: block; }
+  .seg.active .seg-label { color: var(--accent-ink); font-weight: 600; }
+
+  main { flex: 1; display: flex; justify-content: center; padding: 40px 28px 48px; }
+  .card { width: 100%; max-width: 720px; }
+  .card.enter { animation: enter .28s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .card.enter { animation: none; } }
+
+  .chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); padding: 4px 12px; border-radius: 999px; }
+  h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 34px; line-height: 1.2; margin: 16px 0 6px; }
+  .hint { margin: 0 0 24px; color: var(--muted); font-size: 15px; }
+
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: 12px; cursor: pointer; background: var(--surface); transition: border-color .15s, background .15s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .mark { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--line-strong); display: grid; place-items: center; transition: all .15s; }
+  .opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .opt:has(input:checked) .mark { border-color: var(--accent); background: var(--accent); }
+  .opt:has(input:checked) .mark::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+  .opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .dk { margin-top: 14px; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: var(--ink-soft); font-size: 15px; padding: 6px 2px; }
+  .dk input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .btn { min-height: 46px; padding: 0 22px; border-radius: 10px; cursor: pointer; font-weight: 500; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); display: inline-flex; align-items: center; gap: 8px; }
+  .btn-primary:hover { background: var(--accent-ink); }
+  .btn-text { border: 0; background: none; color: var(--ink-soft); padding: 0 6px; }
+  .btn-text:hover { color: var(--ink); text-decoration: underline; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .kbd { font-size: 12px; color: var(--muted); }
+
+  .intro, .done { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 24px; }
+  .intro h1, .done h1 { margin: 6px 0 0; }
+  .intro p, .done p { margin: 0; color: var(--ink-soft); max-width: 520px; }
+  .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 8px 0 6px; }
+  .fact { font-size: 14px; color: var(--ink-soft); background: var(--surface-alt); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; }
+  .done-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; }
+
+  @media (max-width: 640px) {
+    header { padding: 10px 16px; }
+    .progress { padding: 14px 16px 0; }
+    .segments { gap: 6px; }
+    .seg-label { font-size: 11px; }
+    main { padding: 24px 16px 32px; }
+    h1 { font-size: 26px; }
+    .kbd { display: none; }
+    .counter .word { display: none; }
+    .brand-sub { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 18 L9 12 L13 15 L20 6"/><circle cx="20" cy="6" r="1.5"/></svg></div>
+      <div><span class="brand-title">AI Readiness Assessment</span><span class="brand-sub">Questionnaire</span></div>
+    </div>
+    <span class="counter mono" id="counter"></span>
+  </header>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <main><div class="card" id="card"></div></main>
+</div>
+
+<script>
+// Mock-up: one question per screen. Questions come from questionnaire.json;
+// scores are never shown. Nothing is sent or saved in this mock-up.
+const Q = {
+  "version": "0.2",
+  "rubric_version": "0.11",
+  "scoring": {
+    "subdimension_score": "Each question measures one subdimension. The chosen option is the subdimension score, a whole number from 0 to 5.",
+    "dont_know": "'I don't know' gives a score of 0 and sets the flag 'insufficient_evidence', as in the chatbot.",
+    "aggregation": "Dimension and overall scores, rounding and the report follow the same rules as the chatbot (Sections 2.4 and 2.5)."
+  },
+  "dimensions": [
+    {
+      "name": "Data",
+      "subdimensions": [
+        {
+          "name": "Discoverability",
+          "items": [
+            {
+              "id": "Q01",
+              "question": "How do employees find the data they need for their work?",
+              "options": [
+                {
+                  "text": "There is no way to find data, and nobody has seen this as a problem.",
+                  "value": 0
+                },
+                {
+                  "text": "Everyone searches or asks around on their own; it takes a lot of effort and often fails.",
+                  "value": 1
+                },
+                {
+                  "text": "Within teams, people know whom to ask or keep their own lists, but this depends on specific people.",
+                  "value": 2
+                },
+                {
+                  "text": "There is a documented overview for the whole organization, such as a data catalog, so finding data doesn't depend on specific people.",
+                  "value": 3
+                },
+                {
+                  "text": "The overview is maintained by someone responsible and checked regularly for gaps and outdated entries.",
+                  "value": 4
+                },
+                {
+                  "text": "The overview is improved continuously based on how people use it and their feedback, supported by automated tools.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Ownership and Stewardship",
+          "items": [
+            {
+              "id": "Q02",
+              "question": "Who is responsible for your organization's key datasets?",
+              "options": [
+                {
+                  "text": "No one, and responsibility for data isn't something the organization thinks about.",
+                  "value": 0
+                },
+                {
+                  "text": "No one clearly; someone steps in only when a problem occurs.",
+                  "value": 1
+                },
+                {
+                  "text": "Within teams it is generally known who looks after which data, but it isn't written down and differs between teams.",
+                  "value": 2
+                },
+                {
+                  "text": "Each key dataset has a formally assigned owner, recorded according to one standard for the whole organization.",
+                  "value": 3
+                },
+                {
+                  "text": "Ownership is reviewed regularly, and datasets without an owner or owners who have left are found and fixed.",
+                  "value": 4
+                },
+                {
+                  "text": "Ownership is improved continuously and built into processes, for example every new dataset gets an owner when it is created.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Quality",
+          "items": [
+            {
+              "id": "Q03",
+              "question": "What is the quality of your data when someone wants to use it for analysis or AI?",
+              "options": [
+                {
+                  "text": "Data quality isn't managed; the data can't be used without being rebuilt.",
+                  "value": 0
+                },
+                {
+                  "text": "Individuals fix problems when they notice them; the data needs a lot of manual cleaning every time.",
+                  "value": 1
+                },
+                {
+                  "text": "Some teams have their own checks, but quality differs between teams and combining data needs a lot of cleaning.",
+                  "value": 2
+                },
+                {
+                  "text": "Documented quality rules apply across the organization, and the data can be used with limited preparation.",
+                  "value": 3
+                },
+                {
+                  "text": "Quality is measured against defined thresholds, rules are enforced in the systems, and deviations are corrected.",
+                  "value": 4
+                },
+                {
+                  "text": "Measurement results are used to improve the rules continuously, recurring problems are fixed at their source, and monitoring is largely automated.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "People",
+      "subdimensions": [
+        {
+          "name": "Culture",
+          "items": [
+            {
+              "id": "Q04",
+              "question": "How do people in your organization approach AI, in their attitude and in their daily work?",
+              "options": [
+                {
+                  "text": "AI isn't used or discussed, and employees have no access to AI tools.",
+                  "value": 0
+                },
+                {
+                  "text": "A few individuals try AI tools on their own without guidance; most lack knowledge or confidence.",
+                  "value": 1
+                },
+                {
+                  "text": "Some teams use AI regularly and encourage experimenting, while others are skeptical or uninvolved.",
+                  "value": 2
+                },
+                {
+                  "text": "The organization supports AI across departments with shared guidelines, and employees are invited to propose ideas.",
+                  "value": 3
+                },
+                {
+                  "text": "AI adoption and attitudes are tracked, for example through usage data or surveys, and low adoption is addressed.",
+                  "value": 4
+                },
+                {
+                  "text": "Experimenting with AI is part of everyday work, and lessons from successes and failures are shared and used to improve.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Talent",
+          "items": [
+            {
+              "id": "Q05",
+              "question": "Who in your organization has the skills to develop or implement AI?",
+              "options": [
+                {
+                  "text": "No one inside or outside the organization, and the need hasn't been recognized.",
+                  "value": 0
+                },
+                {
+                  "text": "Only a few self-taught individuals; AI isn't part of anyone's role.",
+                  "value": 1
+                },
+                {
+                  "text": "Some teams have AI specialists or work with external experts, mostly without involving business experts.",
+                  "value": 2
+                },
+                {
+                  "text": "AI roles are defined across the organization, and AI work combines technical, business and subject-matter expertise.",
+                  "value": 3
+                },
+                {
+                  "text": "AI skills and capacity are assessed regularly, and gaps are closed through hiring, training or partners.",
+                  "value": 4
+                },
+                {
+                  "text": "The organization continuously improves how it attracts, develops and keeps AI talent, with career paths for AI roles.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Training",
+          "items": [
+            {
+              "id": "Q06",
+              "question": "How do employees learn to work with AI?",
+              "options": [
+                {
+                  "text": "There is no AI learning, and the need hasn't been considered.",
+                  "value": 0
+                },
+                {
+                  "text": "Employees learn on their own, without training, guidance or sharing.",
+                  "value": 1
+                },
+                {
+                  "text": "Occasional workshops or knowledge sharing happen in some teams, but they aren't organized systematically.",
+                  "value": 2
+                },
+                {
+                  "text": "A structured AI training programme with practical guidance is available to all employees.",
+                  "value": 3
+                },
+                {
+                  "text": "Participation and the effect of training are tracked, and gaps are corrected.",
+                  "value": 4
+                },
+                {
+                  "text": "Training is improved continuously based on feedback and new AI developments, and learning is part of daily work.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Strategy",
+      "subdimensions": [
+        {
+          "name": "AI Ambition",
+          "items": [
+            {
+              "id": "Q07",
+              "question": "Has your organization defined what it wants to achieve with AI?",
+              "options": [
+                {
+                  "text": "No, and leadership isn't interested in defining it.",
+                  "value": 0
+                },
+                {
+                  "text": "No; individuals have ideas, but nothing is defined.",
+                  "value": 1
+                },
+                {
+                  "text": "Some leaders or departments have their own goals for AI, but there is no shared ambition.",
+                  "value": 2
+                },
+                {
+                  "text": "A documented AI ambition or strategy for the whole organization states the role AI should play and is communicated to everyone.",
+                  "value": 3
+                },
+                {
+                  "text": "The ambition is reviewed regularly, at least once a year, against progress and changes such as new regulation.",
+                  "value": 4
+                },
+                {
+                  "text": "The ambition is refined continuously based on results and new developments and actively shapes the long-term direction.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Objectives and Alignment",
+          "items": [
+            {
+              "id": "Q08",
+              "question": "How is AI connected to your organization's business goals?",
+              "options": [
+                {
+                  "text": "It isn't; AI is not considered, or only as a technical topic.",
+                  "value": 0
+                },
+                {
+                  "text": "AI is a technical experiment; any objectives are vague, such as \"become AI-driven\".",
+                  "value": 1
+                },
+                {
+                  "text": "Some leaders connect AI to goals in their own area, but without measurable targets.",
+                  "value": 2
+                },
+                {
+                  "text": "AI objectives are measurable business targets linked to the strategy, with an executive sponsor and a budget.",
+                  "value": 3
+                },
+                {
+                  "text": "Leadership reviews progress against the targets regularly, and missed targets are addressed.",
+                  "value": 4
+                },
+                {
+                  "text": "AI objectives are refined continuously and built into strategic planning and decisions.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Use Case Prioritization",
+          "items": [
+            {
+              "id": "Q09",
+              "question": "How does your organization decide which AI ideas to pursue?",
+              "options": [
+                {
+                  "text": "It doesn't; no one has considered where AI could bring value.",
+                  "value": 0
+                },
+                {
+                  "text": "Ideas start ad hoc from individual interest or available tools, without any assessment.",
+                  "value": 1
+                },
+                {
+                  "text": "Teams choose and fund their own AI projects, each judging them in their own way.",
+                  "value": 2
+                },
+                {
+                  "text": "An organization-wide process assesses ideas against criteria such as business value and feasibility, and a designated body decides.",
+                  "value": 3
+                },
+                {
+                  "text": "The results of AI projects are measured against their expected value, and weak projects are adjusted or stopped.",
+                  "value": 4
+                },
+                {
+                  "text": "The selection process is improved continuously based on past results, and new opportunities are searched for systematically.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Technology",
+      "subdimensions": [
+        {
+          "name": "Infrastructure",
+          "items": [
+            {
+              "id": "Q10",
+              "question": "How well do your organization's systems support the use of AI?",
+              "options": [
+                {
+                  "text": "Systems are outdated or isolated and can't support AI, and this hasn't been considered.",
+                  "value": 0
+                },
+                {
+                  "text": "There are only basic services such as email and file storage; AI is used only through public tools, and data is moved by hand.",
+                  "value": 1
+                },
+                {
+                  "text": "Some teams have the systems and tools they need for AI, but systems differ and are mostly not connected.",
+                  "value": 2
+                },
+                {
+                  "text": "A common technical environment for the whole organization provides approved AI services, and key systems are connected.",
+                  "value": 3
+                },
+                {
+                  "text": "The environment is monitored for availability, performance, usage and costs, and problems are resolved.",
+                  "value": 4
+                },
+                {
+                  "text": "The environment is improved continuously, with automated deployment and scaling of AI.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Technology Sourcing",
+          "items": [
+            {
+              "id": "Q11",
+              "question": "How does your organization obtain AI tools and solutions?",
+              "options": [
+                {
+                  "text": "It hasn't obtained any and hasn't considered how it would.",
+                  "value": 0
+                },
+                {
+                  "text": "Individuals choose tools themselves, often free versions, without approval.",
+                  "value": 1
+                },
+                {
+                  "text": "Teams buy or build their own solutions, without coordination.",
+                  "value": 2
+                },
+                {
+                  "text": "A common approach evaluates tools and vendors against defined criteria, and approved tools and contracts are managed centrally.",
+                  "value": 3
+                },
+                {
+                  "text": "Vendors, costs and licence use are monitored, and problems are addressed.",
+                  "value": 4
+                },
+                {
+                  "text": "The approach is improved continuously, and build-or-buy decisions are reassessed as needs change.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Security and Scalability",
+          "items": [
+            {
+              "id": "Q12",
+              "question": "How does your organization keep its use of AI secure and able to grow?",
+              "options": [
+                {
+                  "text": "There are no controls; anyone may share sensitive data with any AI tool.",
+                  "value": 0
+                },
+                {
+                  "text": "A few people are careful on their own, but there are no rules, and AI stays in individual experiments.",
+                  "value": 1
+                },
+                {
+                  "text": "Some teams have controls and test their AI, but inconsistently, and pilots rarely spread beyond the team.",
+                  "value": 2
+                },
+                {
+                  "text": "Organization-wide rules control which tools may access which data, AI is tested before use, and there is a standard way to roll out pilots.",
+                  "value": 3
+                },
+                {
+                  "text": "AI systems in use are monitored and audited regularly, and incidents are detected and addressed.",
+                  "value": 4
+                },
+                {
+                  "text": "Controls are improved continuously based on audits and new threats, and monitoring is largely automated.",
+                  "value": 5
+                },
+                {
+                  "text": "I don't know",
+                  "value": 0,
+                  "dont_know": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+const flat = [];
+Q.dimensions.forEach((d, di) => d.subdimensions.forEach(s => flat.push({ dim: d.name, di, item: s.items[0] })));
+const answers = {};
+let pos = -1;  // -1 = intro, flat.length = finished
+
+function renderProgress() {
+  const box = document.getElementById('progress');
+  box.innerHTML = '';
+  const seg = document.createElement('div');
+  seg.className = 'segments';
+  seg.style.setProperty('--n', Q.dimensions.length);
+  Q.dimensions.forEach((d, di) => {
+    const items = flat.map((f, i) => ({ ...f, i })).filter(f => f.di === di);
+    const el = document.createElement('div');
+    el.className = 'seg' + (flat[pos] && flat[pos].di === di ? ' active' : '');
+    const bars = document.createElement('div');
+    bars.className = 'seg-bars';
+    bars.style.setProperty('--q', items.length);
+    items.forEach(f => {
+      const s = document.createElement('span');
+      if (answers[f.item.id] !== undefined && f.i !== pos) s.className = 'is-done';
+      if (f.i === pos) s.className = 'is-now';
+      bars.appendChild(s);
+    });
+    const label = document.createElement('span');
+    label.className = 'seg-label';
+    label.textContent = d.name;
+    el.append(bars, label);
+    seg.appendChild(el);
+  });
+  box.appendChild(seg);
+  document.getElementById('counter').innerHTML =
+    pos >= 0 && pos < flat.length ? `<span class="word">Question </span>${pos + 1} of ${flat.length}` : '';
+}
+
+function card(html) {
+  const c = document.getElementById('card');
+  c.classList.remove('enter'); void c.offsetWidth; c.classList.add('enter');
+  c.innerHTML = html;
+  return c;
+}
+
+function render() {
+  renderProgress();
+  window.scrollTo(0, 0);
+  if (pos === -1) {
+    const c = card(`<div class="intro"><span class="chip">Assessment 2 of 2</span>
+      <h1>AI readiness questionnaire</h1>
+      <p>For each question, choose the description that best fits how your organization works today, not what is planned. There are no right or wrong answers.</p>
+      <div class="facts"><span class="fact">${flat.length} questions</span><span class="fact">${Q.dimensions.length} areas</span><span class="fact">About 5 minutes</span></div>
+      <button class="btn btn-primary" type="button" id="go">Start the questionnaire</button></div>`);
+    c.querySelector('#go').onclick = () => { pos = 0; render(); };
+    return;
+  }
+  if (pos >= flat.length) {
+    const c = card(`<div class="done"><div class="done-icon"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3D3FB5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 L10 17 L19 7"/></svg></div>
+      <h1>Questionnaire complete</h1>
+      <p>Thank you. Your answers are saved. Return to the overview to continue.</p>
+      <button class="btn btn-primary" type="button">Back to overview</button>
+      <button class="btn btn-text" type="button" id="review">Review my answers</button></div>`);
+    c.querySelector('#review').onclick = () => { pos = flat.length - 1; render(); };
+    return;
+  }
+
+  const { dim, item } = flat[pos];
+  const opts = item.options.filter(o => !o.dont_know);
+  const dkIndex = item.options.findIndex(o => o.dont_know);
+  const c = card(`<span class="chip">${dim}</span><h1 id="qtitle"></h1>
+    <p class="hint">Choose the description that fits best.</p>
+    <fieldset aria-labelledby="qtitle"><div class="options" id="opts"></div>
+      <label class="dk"><input type="checkbox" id="dk"> I don't know</label></fieldset>
+    <div class="nav"><button class="btn btn-text" type="button" id="back">← Back</button>
+      <span class="kbd">Press Enter to continue</span>
+      <button class="btn btn-primary" type="button" id="next">${pos === flat.length - 1 ? 'Finish' : 'Next'} →</button></div>`);
+  c.querySelector('#qtitle').textContent = item.question;
+  const box = c.querySelector('#opts');
+  item.options.forEach((o, idx) => {
+    if (o.dont_know) return;
+    const label = document.createElement('label');
+    label.className = 'opt';
+    label.innerHTML = '<input type="radio"><span class="mark"></span><span></span>';
+    const input = label.querySelector('input');
+    input.name = item.id; input.value = idx;
+    input.checked = answers[item.id] === idx;
+    label.lastChild.textContent = o.text;
+    input.addEventListener('change', () => { answers[item.id] = idx; dk.checked = false; update(); });
+    box.appendChild(label);
+  });
+  const dk = c.querySelector('#dk');
+  dk.checked = answers[item.id] === dkIndex;
+  dk.addEventListener('change', () => {
+    if (dk.checked) { answers[item.id] = dkIndex; box.querySelectorAll('input').forEach(i => i.checked = false); }
+    else delete answers[item.id];
+    update();
+  });
+  const back = c.querySelector('#back');
+  back.disabled = pos === 0;
+  back.onclick = () => { pos--; render(); };
+  c.querySelector('#next').onclick = next;
+  update();
+}
+
+function update() {
+  const btn = document.getElementById('next');
+  if (btn) btn.disabled = answers[flat[pos].item.id] === undefined;
+  renderProgress();
+}
+function next() {
+  if (pos < 0 || pos >= flat.length || answers[flat[pos].item.id] === undefined) return;
+  pos++; render();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && pos >= 0 && pos < flat.length) next(); });
+render();
+</script>
+</body>
+</html>

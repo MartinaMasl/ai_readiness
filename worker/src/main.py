@@ -25,15 +25,22 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from workers import asgi
 
+import comparison
 import demo
 import flow
 import llm
+import questionnaire
 import storage
+import study
 from report import build_report
 from rubric import load_rubric, only_dimensions
 
 # Read once when the Worker starts; the rubric is the same for every conversation.
 RUBRIC = load_rubric()
+# The questionnaire's questions, checked against the rubric when the Worker starts.
+QUESTIONNAIRE = questionnaire.load_questionnaire(RUBRIC)
+# The comparison questionnaire's content, checked when the Worker starts.
+COMPARISON = comparison.load_comparison()
 
 app = FastAPI()
 
@@ -89,6 +96,22 @@ class StartRequest(BaseModel):
     respondent: str = Field(min_length=1, max_length=100)
 
 
+async def respondent_for(request: Request, token: str) -> dict:
+    """The respondent of a personal link; 403 for an unknown token."""
+    person = await storage.find_respondent(database(request), token)
+    if person is None:
+        raise HTTPException(status_code=403, detail="This link is not valid.")
+    return person
+
+
+async def study_steps(request: Request, person: dict) -> tuple[list[dict], dict]:
+    """The respondent's three steps (study.py) and their assessment rows."""
+    db = database(request)
+    rows = await storage.assessments(db, person["code"])
+    answers = await storage.count_feedback_answers(db, person["code"])
+    return study.steps(person, rows, answers), rows
+
+
 class AnswerRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 
@@ -98,29 +121,272 @@ def home():
     return {"message": "Hello from Cloudflare Workers"}
 
 
+# --- The study: home page ----------------------------------------------------
+
+@api.get("/study")
+async def study_status(r: str, request: Request):
+    """Everything the home page shows: consent, the three steps in the
+    respondent's order with their status, and the number of topics."""
+    person = await respondent_for(request, r)
+    steps, rows = await study_steps(request, person)
+    topics = sum(len(d.subdimensions) for d in only_dimensions(RUBRIC, dimensions_setting(request)).dimensions)
+    for step in steps:
+        if step["key"] in ("chatbot", "questionnaire") and step["status"] == "in_progress":
+            state = await storage.load_state(database(request), rows[step["key"]]["id"])
+            total = sum(len(d["subdimensions"]) for d in flow.outline(conversation_rubric(state)))
+            if step["key"] == "chatbot":
+                step["progress"] = f"{state['subdimension_index']} of {total} topics answered"
+            else:
+                step["progress"] = f"{len(state['answers'])} of {total} questions answered"
+    return {
+        "consent": person["consent_at"] is not None,
+        "complete": person["feedback_submitted_at"] is not None,
+        "topics": topics,
+        "steps": steps,
+    }
+
+
+@api.post("/study/consent")
+async def give_consent(body: StartRequest, request: Request):
+    person = await respondent_for(request, body.respondent)
+    await storage.set_consent(database(request), person["code"])
+    return {"consent": True}
+
+
+# --- The chatbot ---------------------------------------------------------------
+
 @api.post("/conversations")
 async def start_conversation(body: StartRequest, request: Request):
+    """Start the respondent's chatbot conversation, or return the one they
+    already have (each respondent has at most one; "Continue" resumes it)."""
     db = database(request)
-    # Only people with a personal link can start a conversation.
-    respondent = await storage.find_respondent(db, body.respondent)
-    if respondent is None:
-        raise HTTPException(status_code=403, detail="This link is not valid.")
+    person = await respondent_for(request, body.respondent)
+    steps, rows = await study_steps(request, person)
+    if rows["chatbot"]:
+        return {"id": rows["chatbot"]["id"]}
+    if not study.can_start(steps, "chatbot"):
+        step = next(s for s in steps if s["key"] == "chatbot")
+        raise HTTPException(status_code=409, detail=step["reason"] or "This assessment is not available.")
     conversation_id = str(uuid.uuid4())
     rubric = only_dimensions(RUBRIC, dimensions_setting(request))
     state, log = flow.new_conversation(rubric, conversation_id, storage.now(),
-                                       model(request.scope["env"]).info(), respondent)
-    await storage.create_conversation(db, conversation_id, state, respondent["code"])
+                                       model(request.scope["env"]).info(),
+                                       {"code": person["code"], "role": person["role"]})
+    await storage.create_conversation(db, conversation_id, state, person["code"], "chatbot")
     await storage.save_log(db, conversation_id, log)
+    return {"id": conversation_id}
+
+
+@api.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str, r: str, request: Request):
+    """The conversation so far, so the chat page can show it and continue."""
+    person = await respondent_for(request, r)
+    info = await storage.assessment(database(request), conversation_id)
+    if info is None or info["respondent_code"] != person["code"] or info["format"] != "chatbot":
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    state = await storage.load_state(database(request), conversation_id)
+    rubric = conversation_rubric(state)
+    positions = {sub.name: i for i, (_, sub) in enumerate(flow.all_subdimensions(rubric))}
     return {
         "id": conversation_id,
-        "started_at": log["started_at"],
-        "intro": state["transcript"][0]["text"],
-        "question": state["transcript"][-1]["text"],
+        "started_at": info["created_at"],
         # For the progress sidebar: all dimensions and subdimensions, and
         # the position of the current subdimension in that list.
         "outline": flow.outline(rubric),
         "position": state["subdimension_index"],
+        "done": state["done"],
+        # Each message with the position of its subdimension (None for the
+        # intro and the closing message), so the page can show the dividers.
+        "messages": [
+            {"role": m["role"], "text": m["text"], "position": positions.get(m["subdimension"])}
+            for m in state["transcript"]
+        ],
     }
+
+
+# --- The questionnaire ---------------------------------------------------------
+
+class QuestionnaireAnswer(BaseModel):
+    respondent: str = Field(min_length=1, max_length=100)
+    item: str = Field(min_length=1, max_length=20)  # question id, e.g. "Q01"
+    option: int = Field(ge=0)  # index of the chosen option in questionnaire.json
+
+
+@api.post("/questionnaire/start")
+async def start_questionnaire(body: StartRequest, request: Request):
+    """Start the respondent's questionnaire, or return the one they already
+    have (each respondent has at most one; "Continue" resumes it)."""
+    db = database(request)
+    person = await respondent_for(request, body.respondent)
+    steps, rows = await study_steps(request, person)
+    if rows["questionnaire"]:
+        return {"id": rows["questionnaire"]["id"]}
+    if not study.can_start(steps, "questionnaire"):
+        step = next(s for s in steps if s["key"] == "questionnaire")
+        raise HTTPException(status_code=409, detail=step["reason"] or "This assessment is not available.")
+    conversation_id = str(uuid.uuid4())
+    rubric = only_dimensions(RUBRIC, dimensions_setting(request))
+    # The same state fields the report needs from a chatbot conversation
+    # (dimensions, done, finished), plus the answers.
+    state = {"dimensions": [d.name for d in rubric.dimensions], "answers": {}, "done": False, "finished": []}
+    await storage.create_conversation(db, conversation_id, state, person["code"], "questionnaire")
+    await storage.save_log(db, conversation_id, {
+        "id": conversation_id,
+        "format": "questionnaire",
+        "respondent": {"code": person["code"], "role": person["role"]},
+        "started_at": storage.now(),
+        "questionnaire_version": QUESTIONNAIRE["version"],
+        "rubric_version": RUBRIC.version,
+    })
+    return {"id": conversation_id}
+
+
+async def open_questionnaire(request: Request, token: str) -> tuple[dict, dict, list[dict], dict]:
+    """The respondent's questionnaire: (its row, its state, its questions,
+    the respondent). 404 if not started."""
+    person = await respondent_for(request, token)
+    rows = await storage.assessments(database(request), person["code"])
+    row = rows["questionnaire"]
+    if row is None:
+        raise HTTPException(status_code=404, detail="The questionnaire has not been started")
+    state = await storage.load_state(database(request), row["id"])
+    return row, state, questionnaire.items(QUESTIONNAIRE, conversation_rubric(state)), person
+
+
+@api.get("/questionnaire")
+async def get_questionnaire(r: str, request: Request):
+    """The questions (without their scores), the answers so far and where to
+    continue."""
+    row, state, questions, person = await open_questionnaire(request, r)
+    steps, _ = await study_steps(request, person)
+    step = next(s for s in steps if s["key"] == "questionnaire")
+    return {
+        "id": row["id"],
+        "position": step["position"],  # "Assessment 1 of 2" / "2 of 2"
+        "dimensions": state["dimensions"],
+        "questions": questionnaire.for_page(questions),
+        "answers": {item: answer["option"] for item, answer in state["answers"].items()},
+        "resume_at": questionnaire.first_unanswered(questions, state["answers"]),
+        "done": state["done"],
+        "finished_at": row["finished_at"],
+    }
+
+
+@api.post("/questionnaire/answer")
+async def answer_question(body: QuestionnaireAnswer, request: Request):
+    """Save one answer immediately. Answers can be changed until the
+    respondent finishes."""
+    row, state, questions, _ = await open_questionnaire(request, body.respondent)
+    if state["done"]:
+        raise HTTPException(status_code=409, detail="The questionnaire is already finished")
+    question = next((q for q in questions if q["item"]["id"] == body.item), None)
+    if question is None or body.option >= len(question["item"]["options"]):
+        raise HTTPException(status_code=400, detail="Unknown question or option")
+    timestamp = storage.now()
+    earlier = state["answers"].get(body.item)
+    state["answers"][body.item] = {
+        "option": body.option,
+        "first_answered_at": earlier["first_answered_at"] if earlier else timestamp,
+        "answered_at": timestamp,
+    }
+    await storage.save_state(database(request), row["id"], state)
+    return {"answered": len(state["answers"]), "total": len(questions)}
+
+
+@api.post("/questionnaire/finish")
+async def finish_questionnaire(body: StartRequest, request: Request):
+    """Score every subdimension from its answer and save the results like
+    the chatbot's, so the same report code works for both."""
+    db = database(request)
+    row, state, questions, _ = await open_questionnaire(request, body.respondent)
+    if not state["done"]:
+        if questionnaire.first_unanswered(questions, state["answers"]) < len(questions):
+            raise HTTPException(status_code=409, detail="Not every question is answered yet")
+        for finished, entry in questionnaire.results(questions, state["answers"]):
+            await storage.save_result(db, row["id"], finished, entry)
+        state["done"] = True
+        await storage.save_state(db, row["id"], state)
+        await storage.set_finished(db, row["id"])
+        log = await storage.load_log(db, row["id"])
+        log["answers"] = state["answers"]  # the raw answers, for the author
+        await storage.save_log(db, row["id"], log)
+    return {"id": row["id"]}
+
+
+# --- The comparison questionnaire ----------------------------------------------
+
+class ComparisonSection(BaseModel):
+    respondent: str = Field(min_length=1, max_length=100)
+    section: str = Field(min_length=1, max_length=50)  # section id in comparison.json
+    # {question id: option index (scale, choice) or text}
+    answers: dict[str, int | str | None]
+
+
+async def open_comparison(request: Request, token: str) -> tuple[dict, list[dict], dict]:
+    """(respondent, their sections in order, their answers so far). 409 if
+    the feedback is not available yet (both assessments must be finished)."""
+    person = await respondent_for(request, token)
+    steps, _ = await study_steps(request, person)
+    feedback = next(s for s in steps if s["key"] == "feedback")
+    if feedback["status"] == "locked":
+        raise HTTPException(status_code=409, detail=feedback["reason"])
+    answers = await storage.comparison_answers(database(request), person["code"])
+    return person, comparison.for_respondent(COMPARISON, person["format_order"]), answers
+
+
+@api.get("/comparison")
+async def get_comparison(r: str, request: Request):
+    """The sections in the respondent's order, the answers so far and where
+    to continue."""
+    person, sections, answers = await open_comparison(request, r)
+    return {
+        "version": COMPARISON["version"],
+        "sections": sections,
+        "answers": {qid: (answer if _is_text(qid) else int(answer)) for qid, answer in answers.items()},
+        "resume_at": comparison.resume_at(sections, answers),
+        "submitted": person["feedback_submitted_at"] is not None,
+    }
+
+
+def _is_text(question_id: str) -> bool:
+    return any(item["id"] == question_id and item["type"] == "text"
+               for section in COMPARISON["sections"] for item in section["items"])
+
+
+@api.post("/comparison/section")
+async def save_comparison_section(body: ComparisonSection, request: Request):
+    """Save one section's answers (every question that is not optional must
+    be answered). Answers can be changed until the respondent submits."""
+    person, sections, _ = await open_comparison(request, body.respondent)
+    if person["feedback_submitted_at"]:
+        raise HTTPException(status_code=409, detail="The feedback is already submitted")
+    section = next((s for s in sections if s["id"] == body.section), None)
+    if section is None:
+        raise HTTPException(status_code=400, detail="Unknown section")
+    try:
+        checked = {item["id"]: comparison.check_answer(item, body.answers.get(item["id"])) for item in section["items"]}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    given = {qid: answer for qid, answer in checked.items() if answer is not None}
+    if not comparison.section_complete(section, given):
+        raise HTTPException(status_code=400, detail="Please answer every question that is not optional")
+    # An optional text left empty is saved as "", so clearing an earlier text works.
+    for item in section["items"]:
+        if item["type"] == "text" and item["id"] not in given:
+            given[item["id"]] = ""
+    for qid, answer in given.items():
+        await storage.save_comparison_answer(database(request), person["code"], qid, answer, COMPARISON["version"])
+    return {"saved": len(given)}
+
+
+@api.post("/comparison/submit")
+async def submit_comparison(body: StartRequest, request: Request):
+    """Finish the study: every section must be complete."""
+    person, sections, answers = await open_comparison(request, body.respondent)
+    if comparison.resume_at(sections, answers) < len(sections):
+        raise HTTPException(status_code=409, detail="Not every section is complete yet")
+    await storage.set_feedback_submitted(database(request), person["code"])
+    return {"submitted": True}
 
 
 async def score_and_save(env, conversation_id: str, rubric, finished: dict, dimension_records: list[dict]) -> None:
@@ -164,6 +430,9 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
         raise HTTPException(status_code=404, detail="Conversation not found")
     if state["done"]:
         raise HTTPException(status_code=409, detail="Conversation already finished")
+    info = await storage.assessment(db, conversation_id)
+    if info["excluded"]:
+        raise HTTPException(status_code=409, detail="This conversation is no longer part of the study")
 
     rubric = conversation_rubric(state)
     try:
@@ -177,6 +446,8 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
     for finished in to_score:
         finished["finished_at"] = storage.now()  # when scoring started (see report())
     await storage.save_state(db, conversation_id, state)
+    if done:
+        await storage.set_finished(db, conversation_id)
     if to_score:
         # A dimension has ended: score its subdimensions together, after the
         # response is sent; the Worker keeps running until they are done.
@@ -190,7 +461,10 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
 
 
 @api.get("/conversations/{conversation_id}/report")
-async def report(conversation_id: str, request: Request):
+async def report(conversation_id: str, request: Request, view: int = 0):
+    """The report of one assessment (chatbot or questionnaire), from its own
+    subdimension_results only. view=1: opened on the report page itself
+    (not the compare page), which is stored the first time."""
     # Made-up scores for checking the report design (see demo.py).
     if conversation_id == "demo":
         return build_report(RUBRIC, demo.worked_example_scores(RUBRIC))
@@ -221,7 +495,13 @@ async def report(conversation_id: str, request: Request):
             dimension_records = [f for f in state["finished"] if f["dimension"] == finished["dimension"]]
             await score_and_save(env, conversation_id, rubric, finished, dimension_records)
         levels = await storage.load_levels(db, conversation_id)
-    return build_report(rubric, levels)
+    result = build_report(rubric, levels)
+    info = await storage.assessment(db, conversation_id)
+    # Which assessment this report belongs to, for the heading on the page.
+    result["assessment"] = {"format": info["format"], "finished_at": info["finished_at"]}
+    if view:
+        await storage.set_report_viewed(db, conversation_id)
+    return result
 
 
 app.include_router(api)
