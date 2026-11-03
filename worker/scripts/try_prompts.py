@@ -14,9 +14,9 @@ Run from the worker/ folder:
 import asyncio
 import json
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
-
-from openai import AsyncOpenAI, APIStatusError
 
 WORKER = Path(__file__).parent.parent
 sys.path.insert(0, str(WORKER / "src"))
@@ -98,14 +98,32 @@ def read_settings() -> dict:
     return settings
 
 
-async def run(client, settings: dict, prompt: str, answer_model, sub, to_log) -> None:
+def _post(url: str, headers: dict, body: dict) -> tuple[int, dict]:
+    request = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.load(error)
+        except ValueError:
+            return error.code, {}
+
+
+async def send_with_urllib(url: str, headers: dict, body: dict) -> tuple[int, dict]:
+    """Send one request from this computer (the Worker uses its fetch instead)."""
+    return await asyncio.to_thread(_post, url, headers, body)
+
+
+async def run(settings: dict, prompt: str, answer_model, sub, to_log) -> None:
     try:
         result, model_version = await llm.call_model(
-            client, settings["MODEL_ID"], float(settings["TEMPERATURE"]), prompt, answer_model
+            send_with_urllib, settings["OPENAI_API_KEY"], settings["MODEL_ID"],
+            float(settings["TEMPERATURE"]), prompt, answer_model
         )
-    except APIStatusError as error:
-        # Show OpenAI's explanation, e.g. if the model does not accept temperature 0.
-        sys.exit(f"OpenAI returned {error.status_code}:\n{error.message}")
+    except llm.ModelCallError as error:
+        # Show OpenAI's explanation, e.g. if the model does not accept a setting.
+        sys.exit(str(error))
     print(f"  (answered by {model_version})")
     try:
         print(json.dumps(to_log(result, sub), indent=2, ensure_ascii=False))
@@ -116,7 +134,6 @@ async def run(client, settings: dict, prompt: str, answer_model, sub, to_log) ->
 
 async def main() -> None:
     settings = read_settings()
-    client = AsyncOpenAI(api_key=settings["OPENAI_API_KEY"])
     rubric = load_rubric()
     in_order = [sub for dim in rubric.dimensions for sub in dim.subdimensions]
     subs = {sub.name: sub for sub in in_order}
@@ -139,10 +156,10 @@ async def main() -> None:
         topic = flow.next_topic(rubric, subdimensions, in_order.index(sub))
         if topic:
             print(f"  (transition phrase: {topic['phrase']!r}, area ended: {topic['ended_dimension']})")
-        await run(client, settings, llm.check_prompt(check_template, rubric, sub, messages, topic, []),
+        await run(settings, llm.check_prompt(check_template, rubric, sub, messages, topic, []),
                   llm.CheckResult, sub, lambda result, sub: llm.check_to_log(result, sub, topic))
         print("\n--- score")
-        await run(client, settings, llm.score_prompt(score_template, rubric, sub, messages, []), llm.ScoreResult, sub, llm.score_to_log)
+        await run(settings, llm.score_prompt(score_template, rubric, sub, messages, []), llm.ScoreResult, sub, llm.score_to_log)
 
 
 if __name__ == "__main__":

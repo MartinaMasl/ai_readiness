@@ -394,17 +394,21 @@ affect a running conversation.
   Workers can be used; verify a package there before relying on it.
 - Cloudflare D1 (SQL database) for the conversation state and the logs.
 - The flow: plain Python, no LangGraph (see "How the chatbot works").
-- Model calls: OpenAI's own Python package (`openai`), no LangChain
-  (see DECISIONS.md). The Pydantic models are passed to it for
-  structured output, and the reply is validated with them. The Worker
-  bundle limit is 64 MiB uncompressed on every plan; check new packages
-  against it with `uv run pywrangler deploy --dry-run`. Provider: OpenAI, model
+- Model calls: a plain HTTP request to OpenAI's Chat Completions API
+  (`llm.call_model`), sent with the Worker's built-in `fetch`
+  (`send_with_fetch` in `main.py`; the scripts use urllib). No `openai`
+  package and no LangChain: on the free plan a request may use only 10 ms
+  of CPU time, and loading the `openai` package inside a request alone
+  exceeded it (see DECISIONS.md). The JSON schema for structured output
+  is generated from the Pydantic models, and the reply is validated with
+  them. Keep CPU work per request small; waiting for OpenAI does not
+  count. The Worker bundle limit is 64 MiB uncompressed on every plan;
+  check new packages against it with `uv run pywrangler deploy --dry-run`.
+  Provider: OpenAI, model
   GPT-6.1 Sol. Model id and temperature are Worker settings (`MODEL_ID`,
   `TEMPERATURE` in `wrangler.jsonc`), the key is the secret
   `OPENAI_API_KEY`. Temperature is 1, because GPT-6.1 Sol accepts only its
-  default; no dated version of it is available (see DECISIONS.md). Import
-  `openai` inside functions, never at the top of a module: Workers do not
-  allow the randomness it uses while loading.
+  default; no dated version of it is available (see DECISIONS.md).
 - Pydantic models for the rubric file, the check result, the score and
   the log. Use them for structured model output.
 - Plain HTML and JavaScript for the chat page and the report page. The

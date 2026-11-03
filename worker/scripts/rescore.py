@@ -16,7 +16,6 @@ import json
 import sys
 from pathlib import Path
 
-from openai import AsyncOpenAI
 
 WORKER = Path(__file__).parent.parent
 sys.path.insert(0, str(WORKER / "src"))
@@ -25,7 +24,7 @@ sys.path.insert(0, str(WORKER / "scripts"))
 import llm  # noqa: E402
 from rubric import load_rubric  # noqa: E402
 from show_log import query, quoted  # noqa: E402
-from try_prompts import read_settings  # noqa: E402
+from try_prompts import read_settings, send_with_urllib  # noqa: E402
 
 BEST_FIT = (
     "Choose the level whose description fits the evidence best as a whole. A level fits when "
@@ -60,7 +59,7 @@ async def main() -> None:
         sys.exit(__doc__)
 
     settings = read_settings()
-    model = llm.OpenAIModel(AsyncOpenAI(api_key=settings["OPENAI_API_KEY"], timeout=120.0),
+    model = llm.OpenAIModel(send_with_urllib, settings["OPENAI_API_KEY"],
                             settings["MODEL_ID"], float(settings["TEMPERATURE"]))
     rubric = load_rubric()
     subs = {s.name: s for d in rubric.dimensions for s in d.subdimensions}

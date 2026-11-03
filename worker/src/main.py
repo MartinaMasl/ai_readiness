@@ -17,13 +17,14 @@ MODEL_ID, TEMPERATURE, TEST_MODE, DIMENSIONS. Secret: OPENAI_API_KEY.
 """
 
 import asyncio
+import json
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from workers import asgi
+from workers import asgi, fetch
 
 import comparison
 import demo
@@ -65,17 +66,22 @@ def test_mode(request: Request) -> bool:
 BACKGROUND_SCORE_SECONDS = 60
 
 
+async def send_with_fetch(url: str, headers: dict, body: dict) -> tuple[int, dict]:
+    """Send one request with the Worker's built-in fetch. No package is
+    loaded for it, so it costs almost no CPU time (the free plan allows
+    10 ms per request; waiting for OpenAI does not count)."""
+    response = await fetch(url, method="POST", headers=headers, body=json.dumps(body))
+    text = await response.text()
+    try:
+        reply = json.loads(text)
+    except ValueError:
+        reply = {}
+    return response.status, reply
+
+
 def model(env) -> llm.OpenAIModel:
     """The model with the settings of this Worker. env: request.scope["env"]."""
-    # Imported here, not at the top: the openai package uses randomness when
-    # it loads, which Workers do not allow while the Worker is starting.
-    from openai import AsyncOpenAI
-
-    # One timeout of 120 s for everything: on Workers the package's default
-    # 5 s connect timeout also covers waiting for the whole answer, which
-    # takes longer than that.
-    client = AsyncOpenAI(api_key=env.OPENAI_API_KEY, timeout=120.0)
-    return llm.OpenAIModel(client, env.MODEL_ID, float(env.TEMPERATURE))
+    return llm.OpenAIModel(send_with_fetch, env.OPENAI_API_KEY, env.MODEL_ID, float(env.TEMPERATURE))
 
 
 def dimensions_setting(request: Request) -> list[str]:
@@ -420,7 +426,6 @@ async def score_dimension_in_background(env, conversation_id: str, rubric, to_sc
 
 @api.post("/conversations/{conversation_id}/answer")
 async def answer(conversation_id: str, body: AnswerRequest, request: Request):
-    from openai import APIError  # see model() for why it is imported here
     from workers import wait_until
 
     env = request.scope["env"]
@@ -437,9 +442,9 @@ async def answer(conversation_id: str, body: AnswerRequest, request: Request):
     rubric = conversation_rubric(state)
     try:
         message, done, to_score = await flow.handle_answer(rubric, state, body.text.strip(), model(env))
-    except (APIError, ValueError) as error:
-        # The model call failed or its answer did not pass the checks in
-        # llm.py. Nothing is saved, so the respondent can send the answer again.
+    except ValueError as error:
+        # The model call failed (llm.ModelCallError) or its answer did not
+        # pass the checks in llm.py. Nothing is saved, so the respondent can send the answer again.
         print(f"Model step failed for {conversation_id}: {type(error).__name__}: {error}")
         raise HTTPException(status_code=502, detail="The chatbot could not process the answer. Please try again.")
 

@@ -1,12 +1,11 @@
 """The two model calls, check and score.
 
-This module builds the prompt, calls OpenAI with the `openai` package and
+This module builds the prompt, calls OpenAI with a plain HTTP request and
 checks the model's reply. The Worker (through OpenAIModel) and the test
 script (scripts/try_prompts.py) both use it, so they run the same code.
 
-Structured output: the Pydantic models below are passed to the `openai`
-package, which turns them into the JSON schema sent to OpenAI and
-validates the reply with them.
+Structured output: the JSON schema sent to OpenAI is generated from the
+Pydantic models below, and the reply is validated with the same models.
 """
 
 from pathlib import Path
@@ -177,22 +176,56 @@ def score_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: lis
 
 
 # --- The model call ---------------------------------------------------------
+# A plain HTTP request to OpenAI's Chat Completions API, without the openai
+# package: on Workers that package can only be loaded inside a request, and
+# loading it alone exceeds the free plan's CPU limit (10 ms per request).
+# Sending is done by a function passed in (`send`): the Worker's built-in
+# fetch in main.py, urllib in the scripts, a fake in the tests.
 
-async def call_model(client, model_id: str, temperature: float, prompt: str,
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+
+class ModelCallError(ValueError):
+    """The model call failed, or its answer could not be used."""
+
+
+def request_body(model_id: str, temperature: float, prompt: str, answer_model: type[StrictModel]) -> dict:
+    """The JSON body for OpenAI. response_format makes the model answer with
+    exactly the structure of answer_model (structured output, strict)."""
+    return {
+        "model": model_id,
+        "temperature": temperature,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": answer_model.__name__, "strict": True, "schema": answer_model.model_json_schema()},
+        },
+    }
+
+
+def parse_reply(reply: dict, answer_model: type[StrictModel]) -> tuple[StrictModel, str]:
+    """The validated answer and the exact model version that answered
+    (OpenAI reports it in "model", which matters when the id is an alias)."""
+    message = reply["choices"][0]["message"]
+    if message.get("refusal"):
+        raise ModelCallError(f"The model refused: {message['refusal']}")
+    return answer_model.model_validate_json(message["content"]), reply["model"]
+
+
+async def call_model(send, api_key: str, model_id: str, temperature: float, prompt: str,
                      answer_model: type[StrictModel]) -> tuple[StrictModel, str]:
-    """Send the prompt and return the validated answer and the exact model
-    version that answered (OpenAI reports it in "model", which matters when
-    the id is an alias). client is an openai.AsyncOpenAI."""
-    completion = await client.chat.completions.parse(
-        model=model_id,
-        temperature=temperature,
-        messages=[{"role": "user", "content": prompt}],
-        response_format=answer_model,
-    )
-    message = completion.choices[0].message
-    if message.refusal:
-        raise ValueError(f"The model refused: {message.refusal}")
-    return message.parsed, completion.model
+    """Send the prompt and return (validated answer, model version).
+    send(url, headers, body) returns (HTTP status, reply as a dict). One
+    retry if OpenAI is briefly unavailable (429 or 5xx)."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    body = request_body(model_id, temperature, prompt, answer_model)
+    for attempt in (1, 2):
+        status, reply = await send(OPENAI_URL, headers, body)
+        if status == 200:
+            return parse_reply(reply, answer_model)
+        if attempt == 2 or not (status == 429 or status >= 500):
+            message = (reply.get("error") or {}).get("message", "") if isinstance(reply, dict) else ""
+            raise ModelCallError(f"OpenAI answered {status}: {message}")
 
 
 class OpenAIModel:
@@ -200,8 +233,9 @@ class OpenAIModel:
     Both return the log format below. (The tests use a fake with the same
     two methods.)"""
 
-    def __init__(self, client, model_id: str, temperature: float):
-        self.client = client  # an openai.AsyncOpenAI
+    def __init__(self, send, api_key: str, model_id: str, temperature: float):
+        self.send = send  # sends one HTTP request (see call_model)
+        self.api_key = api_key
         self.model_id = model_id
         self.temperature = temperature
         self.check_version, self.check_template = load_prompt("check")
@@ -214,17 +248,19 @@ class OpenAIModel:
             "prompt_versions": {"check": self.check_version, "score": self.score_version},
         }
 
+    async def call(self, prompt: str, answer_model: type[StrictModel]) -> StrictModel:
+        result, _ = await call_model(self.send, self.api_key, self.model_id, self.temperature, prompt, answer_model)
+        return result
+
     async def check(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
                     next_topic: dict | None, context: list[dict]) -> dict:
         prompt = check_prompt(self.check_template, rubric, sub, messages, next_topic, context)
-        result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, CheckResult)
-        return check_to_log(result, sub, next_topic)
+        return check_to_log(await self.call(prompt, CheckResult), sub, next_topic)
 
     async def score(self, rubric: Rubric, sub: Subdimension, messages: list[dict],
                     context: list[dict]) -> dict:
         prompt = score_prompt(self.score_template, rubric, sub, messages, context)
-        result, _ = await call_model(self.client, self.model_id, self.temperature, prompt, ScoreResult)
-        return score_to_log(result, sub)
+        return score_to_log(await self.call(prompt, ScoreResult), sub)
 
 
 # --- Into the log format (CLAUDE.md) ----------------------------------------

@@ -1,5 +1,4 @@
 import asyncio
-from types import SimpleNamespace
 
 import pytest
 
@@ -180,33 +179,62 @@ def test_score_not_applicable_only_where_the_rubric_has_a_condition():
         llm.score_to_log(ok, SUB)
 
 
-class FakeClient:
-    """Stands in for openai.AsyncOpenAI: returns a fixed reply."""
-
-    def __init__(self, parsed, refusal=None):
-        message = SimpleNamespace(parsed=parsed, refusal=refusal)
-        completion = SimpleNamespace(choices=[SimpleNamespace(message=message)], model="gpt-6.1-sol-2026-01-01")
-        self.sent = None
-
-        async def parse(**request):
-            self.sent = request
-            return completion
-
-        self.chat = SimpleNamespace(completions=SimpleNamespace(parse=parse))
+def reply_with(answer):
+    """OpenAI's reply (as a dict) carrying this answer."""
+    return {"model": "gpt-6.1-sol-2026-01-01",
+            "choices": [{"message": {"content": answer.model_dump_json(), "refusal": None}}]}
 
 
-def test_call_model_sends_settings_and_returns_answer_and_model_version():
-    answer = llm.ScoreResult(evidence=[], level=2, reason="r", why_not_higher="w", flags=[])
-    client = FakeClient(answer)
-    result, version = asyncio.run(llm.call_model(client, "gpt-6.1-sol", 0, "the prompt", llm.ScoreResult))
+class FakeSend:
+    """Stands in for the function that sends the HTTP request: answers with
+    the given (status, reply) pairs in turn and keeps what was sent."""
+
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.sent = []
+
+    async def __call__(self, url, headers, body):
+        self.sent.append({"url": url, "headers": headers, "body": body})
+        return self.responses.pop(0)
+
+
+SCORE = llm.ScoreResult(evidence=[], level=2, reason="r", why_not_higher="w", flags=[])
+
+
+def test_call_model_sends_the_request_and_returns_answer_and_model_version():
+    send = FakeSend((200, reply_with(SCORE)))
+    result, version = asyncio.run(llm.call_model(send, "sk-test", "gpt-6.1-sol", 1.0, "the prompt", llm.ScoreResult))
     assert result.level == 2 and version == "gpt-6.1-sol-2026-01-01"
-    assert client.sent["temperature"] == 0 and client.sent["response_format"] is llm.ScoreResult
-    assert client.sent["messages"] == [{"role": "user", "content": "the prompt"}]
+    sent = send.sent[0]
+    assert sent["url"] == llm.OPENAI_URL and sent["headers"]["Authorization"] == "Bearer sk-test"
+    assert sent["body"]["model"] == "gpt-6.1-sol" and sent["body"]["temperature"] == 1.0
+    assert sent["body"]["messages"] == [{"role": "user", "content": "the prompt"}]
+    schema = sent["body"]["response_format"]["json_schema"]
+    assert schema["strict"] is True and schema["schema"] == llm.ScoreResult.model_json_schema()
 
 
-def test_call_model_refuses_a_refusal():
-    with pytest.raises(ValueError):
-        asyncio.run(llm.call_model(FakeClient(None, refusal="no"), "m", 0, "p", llm.ScoreResult))
+def test_call_model_retries_once_when_openai_is_briefly_unavailable():
+    send = FakeSend((503, {}), (200, reply_with(SCORE)))
+    result, _ = asyncio.run(llm.call_model(send, "k", "m", 1.0, "p", llm.ScoreResult))
+    assert result.level == 2 and len(send.sent) == 2
+    with pytest.raises(llm.ModelCallError):
+        asyncio.run(llm.call_model(FakeSend((429, {}), (500, {})), "k", "m", 1.0, "p", llm.ScoreResult))
+
+
+def test_call_model_does_not_retry_a_rejected_request_and_says_why():
+    send = FakeSend((400, {"error": {"message": "Unsupported value: 'temperature'"}}))
+    with pytest.raises(llm.ModelCallError, match="400.*temperature"):
+        asyncio.run(llm.call_model(send, "k", "m", 0.0, "p", llm.ScoreResult))
+    assert len(send.sent) == 1
+
+
+def test_call_model_refuses_a_refusal_and_an_answer_that_does_not_fit():
+    refusal = {"model": "m", "choices": [{"message": {"content": None, "refusal": "no"}}]}
+    with pytest.raises(llm.ModelCallError):
+        asyncio.run(llm.call_model(FakeSend((200, refusal)), "k", "m", 1.0, "p", llm.ScoreResult))
+    wrong = {"model": "m", "choices": [{"message": {"content": '{"level": 9}', "refusal": None}}]}
+    with pytest.raises(ValueError):  # Pydantic's ValidationError is a ValueError
+        asyncio.run(llm.call_model(FakeSend((200, wrong)), "k", "m", 1.0, "p", llm.ScoreResult))
 
 
 def test_openai_model_check_and_score_return_the_log_format():
@@ -216,9 +244,8 @@ def test_openai_model_check_and_score_return_the_log_format():
         evidence=[llm.CriterionEvidence(criterion=c.id, evidence="q") for c in sub.criteria],
         level=3, reason="r", why_not_higher="w", flags=[],
     )
-    model = llm.OpenAIModel(FakeClient(check), "gpt-6.1-sol", 1.0)
+    model = llm.OpenAIModel(FakeSend((200, reply_with(check)), (200, reply_with(score))), "k", "gpt-6.1-sol", 1.0)
     assert asyncio.run(model.check(RUBRIC, sub, MESSAGES, NEXT_TOPIC, []))["criteria"][sub.criteria[3].id]["status"] == "not_applicable"
-    model = llm.OpenAIModel(FakeClient(score), "gpt-6.1-sol", 1.0)
     assert asyncio.run(model.score(RUBRIC, sub, MESSAGES, []))["level"] == 3
     info = model.info()
     assert info["model"] == {"id": "gpt-6.1-sol", "settings": {"temperature": 1.0}}

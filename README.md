@@ -72,7 +72,7 @@ Every design decision, with its date and reason, is recorded in
 |---|---|---|
 | Chat page, report page | Plain HTML and JavaScript, Chart.js for the radar chart | Display only; no calculation |
 | API and conversation flow | Python, FastAPI, on Cloudflare Workers | Controls the conversation, applies the rules, calculates scores |
-| Language model | OpenAI GPT-6.1 Sol through the `openai` package | Two narrow tasks: check an answer, score a subdimension |
+| Language model | OpenAI GPT-6.1 Sol, through a plain HTTP request | Two narrow tasks: check an answer, score a subdimension |
 | Database | Cloudflare D1 (SQLite) | Conversation state, log, results |
 | Rubric and prompts | `rubric.json`, `prompts/check.md`, `prompts/score.md` | The methodology texts and the instructions to the model |
 
@@ -242,9 +242,10 @@ every conversation log.
 ### 5.2 Structured output and checks by code
 
 The expected answer of each call is a Pydantic model (`CheckResult`,
-`ScoreResult` in [`llm.py`](worker/src/llm.py)). The `openai` package sends
-it to OpenAI as a JSON schema, so the model must answer in exactly that
-structure, and validates the reply. The code then checks what a schema cannot
+`ScoreResult` in [`llm.py`](worker/src/llm.py)). It is sent to OpenAI as a
+JSON schema (strict structured output) in a plain HTTP request, so the model
+must answer in exactly that structure, and the reply is validated with the same
+model. The code then checks what a schema cannot
 express, for example:
 
 - the criteria are exactly those of the rubric, in order;
@@ -283,7 +284,7 @@ From the check prompt (decided by the author):
 |---|---|---|
 | Provider, model | OpenAI, `gpt-6.1-sol` | No dated version is available; the API reports only this name |
 | Temperature | 1 | The model accepts only its default |
-| Timeout | 120 s | On Workers, the package's default 5 s connect timeout also covered waiting for the whole answer |
+| Request | plain HTTP with the Worker's `fetch` | No package is loaded per request, so the free plan's 10 ms CPU limit is not exceeded; one retry if OpenAI answers 429 or 5xx |
 
 ## 6. Data storage
 
@@ -414,7 +415,7 @@ The full list with dates and reasons is in [`DECISIONS.md`](DECISIONS.md).
 |---|---|
 | Code controls the flow; the model does only check and score | Traceable, explainable assessment; the model cannot skip topics or change the rules |
 | Plain Python flow, no LangGraph | The current LangGraph does not install on Python Workers; the state must be saved by own code anyway |
-| OpenAI's own `openai` package, no LangChain | Smaller and one layer less to explain; switching provider means rewriting one function |
+| Plain HTTP request to OpenAI, no `openai` package or LangChain | The free plan allows 10 ms of CPU per request, and loading the package alone exceeded it; the request is also fully visible in own code; switching provider means rewriting one function |
 | Methodology texts only in the rubric; prompts are templates | One source for the methodology; the same prompts work for every dimension |
 | Each subdimension gets its own score, with the rest of its dimension as context | Respondents refer back to earlier answers; evidence within a dimension is considered as a whole, and every quote is logged so each score stays traceable |
 | Only the first question is fixed; later questions are written by the model | Gives the chatbot the flexibility that distinguishes it from the questionnaire |
