@@ -36,13 +36,19 @@ def test_the_current_file_is_valid_and_both_format_sections_exist():
     assert {"chatbot", "questionnaire"} <= {s["id"] for s in CONTENT["sections"]}
 
 
+def first_of_type(kind):
+    """The first question of this type in the current comparison.json."""
+    return next(item for item in ITEMS.values() if item["type"] == kind)
+
+
 def test_answers_are_checked_by_type():
-    scale, choice, text = ITEMS["C1"], ITEMS["X1"], ITEMS["X3"]
-    assert comparison.check_answer(scale, 4) == "4"
+    scale, choice, text = first_of_type("scale"), first_of_type("choice"), first_of_type("text")
+    last_scale = len(scale["scale"]) - 1
+    assert comparison.check_answer(scale, last_scale) == str(last_scale)
     assert comparison.check_answer(choice, 0) == "0"
     assert comparison.check_answer(text, "  Some words  ") == "Some words"
     assert comparison.check_answer(text, "   ") is None and comparison.check_answer(scale, None) is None
-    for bad_item, bad_value in [(scale, 5), (scale, -1), (choice, True), (choice, "1"), (text, 3),
+    for bad_item, bad_value in [(scale, last_scale + 1), (scale, -1), (choice, True), (choice, "1"), (text, 3),
                                 (text, "x" * (comparison.MAX_TEXT + 1))]:
         with pytest.raises(ValueError):
             comparison.check_answer(bad_item, bad_value)
@@ -51,10 +57,11 @@ def test_answers_are_checked_by_type():
 def test_required_questions_and_resume():
     sections = comparison.for_respondent(CONTENT, "questionnaire_first")
     assert [s["id"] for s in sections][:2] == ["questionnaire", "chatbot"]
+    required = lambda section: {i["id"]: "0" for i in section["items"] if not i.get("optional")}  # noqa: E731
     assert comparison.resume_at(sections, {}) == 0
-    first_done = {"Q1": "1", "Q2": "2"}
+    first_done = required(sections[0])
     assert comparison.resume_at(sections, first_done) == 1
-    all_done = {**first_done, "C1": "0", "C2": "4", "X1": "2", "X2": "1"}  # X3 is optional
+    all_done = {k: v for section in sections for k, v in required(section).items()}  # optional ones left out
     assert comparison.resume_at(sections, all_done) == len(sections)
 
 

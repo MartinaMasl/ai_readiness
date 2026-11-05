@@ -1,33 +1,183 @@
 {
-  "version": "0.1-placeholder",
-  "note": "Layout only. Every question below is a placeholder; the real content will be written by the author.",
+  "version": "0.4",
+  "note": "Short version: 12 items. The Single Ease Question follows a published instrument; check its wording against the original source before citing.",
   "sections": [
     {
       "id": "chatbot",
       "title": "About the conversation",
-      "intro": "Think about the assessment you did as a conversation.",
+      "intro": "Think about the assessment you completed as a conversation with the chatbot.",
       "items": [
-        {"id": "C1", "type": "scale", "question": "[Placeholder] The conversation was easy to use.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]},
-        {"id": "C2", "type": "scale", "question": "[Placeholder] The questions were easy to understand.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]}
+        {
+          "id": "C1",
+          "type": "scale",
+          "construct": "ease of use",
+          "question": "The conversation was easy to use.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        },
+        {
+          "id": "C2",
+          "type": "scale",
+          "construct": "perceived effort (Single Ease Question)",
+          "question": "Overall, how difficult or easy was it to complete the conversation?",
+          "scale": [
+            "Very difficult",
+            "Difficult",
+            "Somewhat difficult",
+            "Neither difficult nor easy",
+            "Somewhat easy",
+            "Easy",
+            "Very easy"
+          ]
+        },
+        {
+          "id": "C3",
+          "type": "scale",
+          "construct": "expressiveness",
+          "question": "I was able to describe my organization's situation accurately.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        },
+        {
+          "id": "C4",
+          "type": "scale",
+          "construct": "perceived report accuracy",
+          "question": "The report from the conversation reflects my organization's current AI readiness accurately.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        }
       ]
     },
     {
       "id": "questionnaire",
       "title": "About the questionnaire",
-      "intro": "Think about the assessment you did as a questionnaire.",
+      "intro": "Think about the assessment you completed as a questionnaire.",
       "items": [
-        {"id": "Q1", "type": "scale", "question": "[Placeholder] The questionnaire was easy to use.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]},
-        {"id": "Q2", "type": "scale", "question": "[Placeholder] The answer options described my organization well.", "scale": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"]}
+        {
+          "id": "Q1",
+          "type": "scale",
+          "construct": "ease of use",
+          "question": "The questionnaire was easy to use.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        },
+        {
+          "id": "Q2",
+          "type": "scale",
+          "construct": "perceived effort (Single Ease Question)",
+          "question": "Overall, how difficult or easy was it to complete the questionnaire?",
+          "scale": [
+            "Very difficult",
+            "Difficult",
+            "Somewhat difficult",
+            "Neither difficult nor easy",
+            "Somewhat easy",
+            "Easy",
+            "Very easy"
+          ]
+        },
+        {
+          "id": "Q3",
+          "type": "scale",
+          "construct": "expressiveness",
+          "question": "I was able to describe my organization's situation accurately.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        },
+        {
+          "id": "Q4",
+          "type": "scale",
+          "construct": "perceived report accuracy",
+          "question": "The report from the questionnaire reflects my organization's current AI readiness accurately.",
+          "scale": [
+            "Strongly disagree",
+            "Disagree",
+            "Somewhat disagree",
+            "Neither agree nor disagree",
+            "Somewhat agree",
+            "Agree",
+            "Strongly agree"
+          ]
+        }
       ]
     },
     {
       "id": "compare",
       "title": "Comparing both",
-      "intro": "Now compare the two formats.",
+      "intro": "Now compare the two formats directly.",
       "items": [
-        {"id": "X1", "type": "choice", "question": "[Placeholder] Which format would you prefer to use again?", "options": ["The conversation", "The questionnaire", "No preference"]},
-        {"id": "X2", "type": "choice", "question": "[Placeholder] Which report describes your organization more accurately?", "options": ["The report from the conversation", "The report from the questionnaire", "Both equally", "Neither"]},
-        {"id": "X3", "type": "text", "question": "[Placeholder] Is there anything you would like to add?", "optional": true}
+        {
+          "id": "X1",
+          "type": "choice",
+          "construct": "preference",
+          "question": "If your organization assessed its AI readiness again, which format would you prefer?",
+          "options": [
+            "The conversation",
+            "The questionnaire",
+            "No preference"
+          ]
+        },
+        {
+          "id": "X2",
+          "type": "text",
+          "construct": "preference (reason)",
+          "question": "Why do you prefer this format?",
+          "optional": true
+        },
+        {
+          "id": "X3",
+          "type": "choice",
+          "construct": "perceived report accuracy (direct comparison)",
+          "question": "Which report describes your organization's AI readiness more accurately?",
+          "options": [
+            "The report from the conversation",
+            "The report from the questionnaire",
+            "Both equally",
+            "Neither"
+          ]
+        },
+        {
+          "id": "X4",
+          "type": "text",
+          "construct": "improvement",
+          "question": "What would you change or add to make either format better?",
+          "optional": true
+        }
       ]
     }
   ]
