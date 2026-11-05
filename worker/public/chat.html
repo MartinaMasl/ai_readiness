@@ -142,7 +142,6 @@
   .send:hover { background: var(--accent-ink); }
   .send:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
   .status { font-size: 13px; color: var(--open); min-height: 1.5em; }
-  .end-actions { padding-left: 44px; display: flex; flex-wrap: wrap; gap: 10px; }  /* lines up with the chatbot's messages */
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* Narrow screens: the overview sits above the chat and shows only the
@@ -160,9 +159,9 @@
     .topics { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
   }
   @media (max-width: 640px) {
-    /* Keep the header to one row: the counter and the header's report button
-       are left out (the finished chat shows its own "View report" button). */
-    #dimCounter, #reportButton { display: none; }
+    /* Keep the header compact: the dimension counter is left out (the overview
+       above the chat shows the dimension); both buttons stay. */
+    #dimCounter { display: none; }
     .header-actions .btn { min-height: 36px; padding: 0 12px; font-size: 14px; }
     header, .composer { padding-left: 16px; padding-right: 16px; }
     header { padding-top: 10px; padding-bottom: 10px; }
@@ -372,20 +371,15 @@
     return response.json();
   }
 
-  // The conversation is over: no more answers, and the report opens only when
-  // the respondent asks for it. (If the last scores are still being calculated,
-  // result.html waits for them.)
+  // The conversation is over: no more answers. The closing message is the last
+  // message; "View report" and "Back to overview" are in the header. The report
+  // opens only when the respondent asks for it (if the last scores are still
+  // being calculated, result.html waits for them).
   function finish() {
     ta.disabled = true;
     sendButton.disabled = true;
     ta.placeholder = 'The conversation is finished.';
     reportButton.disabled = false;
-    const actions = document.createElement('div');
-    actions.className = 'end-actions';
-    actions.innerHTML = '<button class="btn btn-dark" type="button">View report</button>'
-      + '<a class="btn" href="' + overviewUrl + '">Back to overview</a>';
-    actions.querySelector('button').addEventListener('click', openReport);
-    show(() => thread.appendChild(actions), true);
   }
   function openReport() {
     location.href = '/result.html?id=' + conversationId + '&r=' + encodeURIComponent(respondentToken);
@@ -427,6 +421,8 @@
       document.getElementById('sessionInfo').textContent = `Session started ${started}`;
       document.getElementById('asideTitle').textContent =
         ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'][outline.length] + (outline.length === 1 ? ' dimension' : ' dimensions');
+      // Once the report has been opened, the conversation cannot be reopened.
+      if (data.done && data.report_viewed) { openReport(); return; }
       renderDims();
       pending.element.remove();
       data.messages.forEach(replay);

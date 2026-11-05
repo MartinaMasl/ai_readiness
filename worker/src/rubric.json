@@ -143,7 +143,7 @@
             {
               "id": "condition",
               "description": "The state of the data and the effort needed before it can be used.",
-              "look_for": "Inaccurate, duplicate, invalid or conflicting records, differences between systems, and how much cleaning or preparation is needed."
+              "look_for": "Inaccurate, duplicate, invalid or conflicting records, differences between systems, relevance of the data and how much cleaning or preparation is needed."
             },
             {
               "id": "rules",

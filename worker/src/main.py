@@ -201,6 +201,8 @@ async def get_conversation(conversation_id: str, r: str, request: Request):
         "outline": flow.outline(rubric),
         "position": state["subdimension_index"],
         "done": state["done"],
+        # Once the report has been opened, the conversation cannot be reopened.
+        "report_viewed": info["first_report_viewed_at"] is not None,
         # Each message with the position of its subdimension (None for the
         # intro and the closing message), so the page can show the dividers.
         "messages": [

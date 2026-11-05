@@ -174,7 +174,8 @@ identifies the respondent. The link opens the home page; an unknown token
 shows only a short error. The rules are in `worker/src/study.py`.
 
 1. Home page (`worker/public/index.html`, design: `design/home.html`):
-   a consent box with placeholder text (stores `consent_at`), then three
+   a consent box with one sentence and a checkbox ("I agree that my
+   answers will be used for academic purposes."; stores `consent_at`), then three
    steps in the respondent's `format_order` ("chatbot_first" or
    "questionnaire_first", alternated within each role): first
    assessment, second assessment, "Compare and give feedback". Each step
@@ -190,8 +191,12 @@ shows only a short error. The rules are in `worker/src/study.py`.
    a test respondent (code "T…") is reset with `add_respondent.py
    --reset`, which marks their rows `excluded`.
 4. Chatbot (`chat.html`) and questionnaire (`questionnaire.html`, design:
-   `design/questionnaire.html`) both end with the closing message, "View
-   report" and "Back to overview".
+   `design/questionnaire.html`) both end with a closing message. In the
+   chat it is the last message, saying that the conversation cannot be
+   reopened once the report is opened; "View report" and "Back to
+   overview" are in the header. Once the report has been opened, the chat
+   page goes straight to the report. The questionnaire's end screen has
+   "View report" and "Back to overview".
 5. Report (`result.html?id=<id>&r=<token>`): one assessment's own scores
    only, with the heading "Report from the conversation" or "Report from
    the questionnaire" and the completion date. The first time the report
@@ -203,8 +208,9 @@ shows only a short error. The rules are in `worker/src/study.py`.
 7. Comparison questionnaire (`feedback.html`, design:
    `design/comparison.html`): content only from `worker/src/comparison.json`
    (checked when the Worker starts); the sections about the two formats
-   in the order the respondent did them; saved per section with the
-   file's version (`content_version`); Submit sets
+   in the order the respondent did them; all questions on one page, under
+   the section headings; Submit saves them with the file's version
+   (`content_version`) and sets
    `feedback_submitted_at`, and the home page shows the study as complete.
 
 ## The questionnaire
@@ -234,10 +240,12 @@ left and the input box stay in place, and only the messages scroll. New
 messages scroll to the bottom only if the reader is already there, so
 someone rereading earlier messages is not pulled down. On narrow screens
 the overview sits above the chat and shows only the current dimension.
-After the last answer the page shows the closing message and a "View
-report" button and disables the input box; the report
+After the last answer the page shows the closing message as the last
+message (no buttons in the chat) and disables the input box; "View report"
+and "Back to overview" are in the header, also on a phone. The report
 (`/result.html?id=<conversation id>`) opens only when the respondent
-presses the button.
+presses the button; after that, opening the chat page goes straight to the
+report, so the conversation cannot be reopened.
 
 In test mode only (`TEST_MODE` = "1", set locally in `worker/.dev.vars`;
 "0" in `wrangler.jsonc`), the API also returns a summary of the last

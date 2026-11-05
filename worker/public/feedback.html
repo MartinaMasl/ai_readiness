@@ -38,6 +38,8 @@
   .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 32px; line-height: 1.15; margin: 4px 0 6px; }
   .intro { margin: 0; color: var(--ink-soft); }
+  .feedback-section { display: flex; flex-direction: column; gap: 14px; }
+  .feedback-section h2 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 24px; margin: 12px 0 0; }
 
   .item { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
   fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
@@ -102,14 +104,13 @@
 <script>
 // The sections come from GET /api/comparison: the content of comparison.json,
 // with the sections about the two formats in the order the respondent did
-// them. Each section is saved when the respondent goes on.
+// them. All questions are shown on one page and saved with Submit.
 const token = new URLSearchParams(location.search).get('r');
 const overviewUrl = '/?r=' + encodeURIComponent(token || '');
 document.getElementById('overviewLink').href = overviewUrl;
 
-let C = null;          // {version, sections, answers, resume_at, submitted}
+let C = null;          // {version, sections, answers, submitted}
 let answers = {};      // question id -> option index or text
-let pos = 0;           // index of the section shown; sections.length = done
 let submitted = false;
 
 async function api(method, url, body) {
@@ -133,6 +134,46 @@ function fail(text) {
   main.querySelector('a').href = overviewUrl;
 }
 
+function item(question) {
+  const box = document.createElement('div');
+  box.className = 'item';
+  if (question.type === 'text') {
+    const id = 'f_' + question.id;
+    box.innerHTML = `<label class="label" for="${id}"></label><textarea id="${id}" maxlength="5000"></textarea>`;
+    box.querySelector('label').textContent = question.question;
+    if (question.optional) box.querySelector('label').insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
+    const ta = box.querySelector('textarea');
+    ta.value = answers[question.id] || '';
+    ta.addEventListener('input', () => { answers[question.id] = ta.value; update(); });
+    return box;
+  }
+  const fs = document.createElement('fieldset');
+  const lg = document.createElement('legend');
+  lg.textContent = question.question;
+  if (question.optional) lg.insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
+  fs.appendChild(lg);
+  const wrap = document.createElement('div');
+  const values = question.type === 'scale' ? question.scale : question.options;
+  wrap.className = question.type === 'scale' ? 'scale' : 'choices';
+  if (question.type === 'scale') wrap.style.setProperty('--n', values.length);
+  values.forEach((text, idx) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'radio'; input.name = question.id; input.value = idx;
+    input.checked = answers[question.id] === idx;
+    input.addEventListener('change', () => { answers[question.id] = idx; update(); });
+    const span = document.createElement('span');
+    span.textContent = text;
+    label.append(input, span);
+    wrap.appendChild(label);
+  });
+  fs.appendChild(wrap);
+  box.appendChild(fs);
+  return box;
+}
+
+// All questions on one page, grouped under the section headings (in the
+// order the respondent did the assessments), with one Submit at the bottom.
 function render() {
   const main = document.getElementById('main');
   window.scrollTo(0, 0);
@@ -144,101 +185,57 @@ function render() {
     main.querySelector('a').href = overviewUrl;
     return;
   }
-  const sec = C.sections[pos];
-  const last = pos === C.sections.length - 1;
-  document.getElementById('counter').textContent = `Part ${pos + 1} of ${C.sections.length}`;
   main.innerHTML = '';
-
-  const steps = document.createElement('div');
-  steps.className = 'steps';
-  C.sections.forEach((_, i) => { const s = document.createElement('span'); if (i < pos) s.className = 'is-done'; if (i === pos) s.className = 'is-now'; steps.appendChild(s); });
-  main.appendChild(steps);
-
   const head = document.createElement('div');
-  head.innerHTML = '<span class="eyebrow mono">Feedback</span><h1></h1><p class="intro"></p>';
-  head.querySelector('h1').textContent = sec.title;
-  head.querySelector('.intro').textContent = sec.intro || '';
+  head.innerHTML = '<span class="eyebrow mono">Feedback</span><h1>Comparing the two formats</h1>';
   main.appendChild(head);
-
-  sec.items.forEach(item => {
-    const box = document.createElement('div');
-    box.className = 'item';
-    if (item.type === 'text') {
-      const id = 'f_' + item.id;
-      box.innerHTML = `<label class="label" for="${id}"></label><textarea id="${id}" maxlength="5000"></textarea>`;
-      box.querySelector('label').textContent = item.question;
-      if (item.optional) box.querySelector('label').insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
-      const ta = box.querySelector('textarea');
-      ta.value = answers[item.id] || '';
-      ta.addEventListener('input', () => { answers[item.id] = ta.value; update(); });
-    } else {
-      const fs = document.createElement('fieldset');
-      const lg = document.createElement('legend');
-      lg.textContent = item.question;
-      if (item.optional) lg.insertAdjacentHTML('beforeend', ' <span class="optional">(optional)</span>');
-      fs.appendChild(lg);
-      const wrap = document.createElement('div');
-      const values = item.type === 'scale' ? item.scale : item.options;
-      wrap.className = item.type === 'scale' ? 'scale' : 'choices';
-      if (item.type === 'scale') wrap.style.setProperty('--n', values.length);
-      values.forEach((text, idx) => {
-        const label = document.createElement('label');
-        const input = document.createElement('input');
-        input.type = 'radio'; input.name = item.id; input.value = idx;
-        input.checked = answers[item.id] === idx;
-        input.addEventListener('change', () => { answers[item.id] = idx; update(); });
-        const span = document.createElement('span');
-        span.textContent = text;
-        label.append(input, span);
-        wrap.appendChild(label);
-      });
-      fs.appendChild(wrap);
-      box.appendChild(fs);
-    }
-    main.appendChild(box);
+  C.sections.forEach(sec => {
+    const section = document.createElement('section');
+    section.className = 'feedback-section';
+    section.innerHTML = '<h2></h2><p class="intro"></p>';
+    section.querySelector('h2').textContent = sec.title;
+    section.querySelector('.intro').textContent = sec.intro || '';
+    sec.items.forEach(q => section.appendChild(item(q)));
+    main.appendChild(section);
   });
-
   const nav = document.createElement('div');
   nav.className = 'nav';
-  nav.innerHTML = `<button class="btn btn-text" type="button" id="back">← Back</button><span class="nav-note" id="note"></span><button class="btn btn-primary" type="button" id="next">${last ? 'Submit' : 'Next →'}</button>`;
+  nav.innerHTML = '<span class="nav-note" id="note"></span><button class="btn btn-primary" type="button" id="submit">Submit</button>';
   main.appendChild(nav);
   const status = document.createElement('div');
   status.className = 'status'; status.id = 'status';
   main.appendChild(status);
-  nav.querySelector('#back').disabled = pos === 0;
-  nav.querySelector('#back').onclick = () => { pos--; render(); };
-  nav.querySelector('#next').onclick = () => saveAndGo(sec, last);
+  nav.querySelector('#submit').onclick = submit;
   update();
 }
 
-// Saves the section, then shows the next one (or submits after the last).
-async function saveAndGo(sec, last) {
-  const next = document.getElementById('next');
-  next.disabled = true;
-  const sectionAnswers = {};
-  sec.items.forEach(item => { sectionAnswers[item.id] = answers[item.id] === undefined ? null : answers[item.id]; });
+// Saves every section, then submits.
+async function submit() {
+  const button = document.getElementById('submit');
+  button.disabled = true;
   try {
-    await api('POST', '/api/comparison/section', { respondent: token, section: sec.id, answers: sectionAnswers });
-    if (last) {
-      await api('POST', '/api/comparison/submit', { respondent: token });
-      submitted = true;
-    } else {
-      pos++;
+    for (const sec of C.sections) {
+      const sectionAnswers = {};
+      sec.items.forEach(q => { sectionAnswers[q.id] = answers[q.id] === undefined ? null : answers[q.id]; });
+      await api('POST', '/api/comparison/section', { respondent: token, section: sec.id, answers: sectionAnswers });
     }
+    await api('POST', '/api/comparison/submit', { respondent: token });
+    submitted = true;
     render();
   } catch (error) {
-    next.disabled = false;
+    button.disabled = false;
     document.getElementById('status').textContent = 'Your answers could not be saved. Please try again.';
   }
 }
 
 function update() {
-  const sec = C.sections[pos];
-  const left = sec.items.filter(i => !isAnswered(i)).length;
-  const next = document.getElementById('next');
-  if (!next) return;
-  next.disabled = left > 0;
-  document.getElementById('note').textContent = left ? `${left} question${left === 1 ? '' : 's'} left` : '';
+  const left = C.sections.flatMap(sec => sec.items).filter(q => !isAnswered(q)).length;
+  const button = document.getElementById('submit');
+  if (!button) return;
+  button.disabled = left > 0;
+  const note = left ? `${left} question${left === 1 ? '' : 's'} left` : '';
+  document.getElementById('note').textContent = note;
+  document.getElementById('counter').textContent = note;
 }
 
 async function load() {
@@ -253,8 +250,6 @@ async function load() {
   }
   answers = C.answers;
   submitted = C.submitted;
-  // "Continue": the first section that is not complete (the last one if all are).
-  pos = Math.min(C.resume_at, C.sections.length - 1);
   render();
 }
 load();

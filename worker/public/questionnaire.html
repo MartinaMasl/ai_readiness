@@ -122,7 +122,8 @@
 const token = new URLSearchParams(location.search).get('r');
 const overviewUrl = '/?r=' + encodeURIComponent(token || '');
 document.getElementById('overviewLink').href = overviewUrl;
-// Closing message, the same as the chatbot's (flow.py CLOSING).
+// Closing message of the questionnaire (the chatbot's, in flow.py, also says
+// that the conversation cannot be reopened after the report).
 const CLOSING = 'Thank you, that was the last question. You can now view your report.';
 
 let Q = null;            // {id, position, dimensions, questions, answers, resume_at, done}

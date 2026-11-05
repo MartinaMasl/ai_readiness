@@ -66,7 +66,8 @@ def intro(rubric: Rubric) -> str:
     names = [dim.name for dim in rubric.dimensions]
     areas = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
     return INTRO_TEMPLATE.format(areas=areas)
-CLOSING = "Thank you, that was the last question. You can now view your report."
+CLOSING = ("Thank you, that was the last question. You can now view your report. "
+           "Once you open it, you cannot return to the conversation.")
 
 
 def all_subdimensions(rubric: Rubric) -> list[tuple[str, Subdimension]]:

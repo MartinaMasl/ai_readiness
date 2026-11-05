@@ -99,7 +99,7 @@ home ◄── comparison questionnaire ◄── compare page (both reports) �
 | Questionnaire (`questionnaire.html`) | one multiple-choice question per subdimension, one per screen; every answer saved at once; answers can be changed until Finish |
 | Report (`result.html`) | one assessment's own report, headed "Report from the conversation" or "Report from the questionnaire" with its date |
 | Compare (`compare.html`) | both reports (each the real report page in an iframe), side by side or as two tabs on a phone |
-| Feedback (`feedback.html`) | the comparison questionnaire; its content comes only from `comparison.json` |
+| Feedback (`feedback.html`) | the comparison questionnaire, all questions on one page; its content comes only from `comparison.json` |
 
 Rules:
 - **Order.** `format_order` ("chatbot_first" or "questionnaire_first") is set
@@ -526,5 +526,6 @@ uv run pywrangler deploy
   conversation is linked to that respondent's pseudonymous code and role
   (technical or business). Names are never stored; the author keeps the list
   connecting codes to names outside the database and this repository.
-- Consent is asked on the home page before the first assessment (text still a
-  placeholder) and stored with its time.
+- Consent is asked on the home page before the first assessment, with one
+  sentence ("I agree that my answers will be used for academic purposes.")
+  and a checkbox, and stored with its time.
