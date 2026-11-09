@@ -9,7 +9,9 @@ subdimension_results rows written by results().
 
 The answers are kept in the questionnaire's conversations row (its state)
 while the respondent answers: {"answers": {item id: {"option": index,
-"first_answered_at": ..., "answered_at": ...}}, ...}.
+"first_answered_at": ..., "answered_at": ...}}, "first_question_shown_at": ...,
+...}. first_question_shown_at is when "Start the questionnaire" was first
+pressed; active time starts there (timing.py).
 """
 
 import json

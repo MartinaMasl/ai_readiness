@@ -203,7 +203,12 @@ function render() {
       <p>For each question, choose the description that best fits how your organization works today, not what is planned. There are no right or wrong answers.</p>
       <div class="facts"><span class="fact">${n} questions</span><span class="fact">${Q.dimensions.length} ${Q.dimensions.length === 1 ? 'area' : 'areas'}</span><span class="fact">About 5 minutes</span></div>
       <button class="btn btn-primary" type="button" id="go">Start the questionnaire</button></div>`);
-    c.querySelector('#go').onclick = () => { pos = 0; render(); };
+    // Records when the first question is first shown (the start of active
+    // time); waited for, so it is saved before the first answer can be.
+    c.querySelector('#go').onclick = async () => {
+      try { await api('POST', '/api/questionnaire/shown', { respondent: token }); } catch (error) { /* the questionnaire still works */ }
+      pos = 0; render();
+    };
     return;
   }
   if (pos >= n) {

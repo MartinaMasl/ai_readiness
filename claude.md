@@ -222,7 +222,10 @@ subdimension score; "I don't know" scores 0 and sets
 `insufficient_evidence`. One question per screen; every answer is saved
 at once (with the time it was first given); "Continue" resumes at the
 first unanswered question; answers can be changed ("Review my answers")
-until Finish. Finish writes one `subdimension_results` row per
+until Finish. The time the first question is first shown is stored
+(`first_question_shown_at`), so active time (`timing.py`: gaps between
+actions, gaps over 10 minutes count as 0) starts at the same point as in
+the chatbot. Finish writes one `subdimension_results` row per
 subdimension in the same form as the chatbot's, so the same scoring and
 report code is used, and adds the raw answers to the log. The page never
 receives the options' values. `DIMENSIONS` limits the questions like the
@@ -282,9 +285,10 @@ unknown token.
   being calculated. `view=1` (the report page itself) stores
   `first_report_viewed_at` the first time.
 - `POST /api/questionnaire/start`, `GET /api/questionnaire?r=`,
-  `POST /api/questionnaire/answer`, `POST /api/questionnaire/finish`:
-  the questionnaire (start or return, questions and answers so far, save
-  one answer, finish and score).
+  `POST /api/questionnaire/shown`, `POST /api/questionnaire/answer`,
+  `POST /api/questionnaire/finish`: the questionnaire (start or return,
+  questions and answers so far, store when the first question is first
+  shown, save one answer, finish and score).
 - `GET /api/comparison?r=`, `POST /api/comparison/section`,
   `POST /api/comparison/submit`: the comparison questionnaire.
 

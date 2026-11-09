@@ -64,3 +64,48 @@ def test_every_message_of_a_conversation_has_a_timestamp():
     asyncio.run(flow.handle_answer(RUBRIC, state, "an answer", FakeModel()))
     assert all(m["at"] for m in state["transcript"])
     assert timing.duration_seconds(state["transcript"]) >= 0
+
+
+def at(clock):
+    return f"2026-11-01T{clock}+00:00"
+
+
+def test_active_time_leaves_out_gaps_longer_than_ten_minutes():
+    # 2 min, then a pause of 3 hours, then 30 s, then exactly 10 min (still counted).
+    times = [at("10:00:00"), at("10:02:00"), at("13:02:00"), at("13:02:30"), at("13:12:30")]
+    assert timing.active_seconds(times) == 120 + 30 + 600
+    assert timing.pauses(times) == 1
+    assert timing.active_seconds(list(reversed(times))) == 750  # order of the list does not matter
+    assert timing.active_seconds(None) is None and timing.pauses([]) is None
+
+
+def test_chatbot_active_time_runs_from_the_first_question_to_the_last_answer():
+    # MESSAGES plus a next question shown after the last answer, which does not count.
+    assert timing.chatbot_actions(MESSAGES) == [m["at"] for m in MESSAGES[:4]]
+    assert timing.active_seconds(timing.chatbot_actions(MESSAGES)) == 120
+    assert timing.chatbot_actions(MESSAGES[:1]) is None
+
+
+def test_chatbot_active_time_starts_when_the_first_question_is_shown():
+    started = flow.now()
+    state, _ = flow.new_conversation(RUBRIC, "test-id", started, FakeModel().info())
+    asyncio.run(flow.handle_answer(RUBRIC, state, "an answer", FakeModel()))
+    first_question = state["transcript"][1]
+    assert first_question["role"] == "chatbot" and first_question["at"] == started
+    assert min(timing.chatbot_actions(state["transcript"])) == started
+
+
+def test_questionnaire_active_time_runs_from_the_first_question_shown_to_finish():
+    state = {
+        "first_question_shown_at": at("10:00:30"),  # intro screen read from 10:00:00, not counted
+        "answers": {
+            "Q01": {"first_answered_at": at("10:01:00"), "answered_at": at("10:01:00")},
+            # answered, then changed after a pause of a day while reviewing
+            "Q02": {"first_answered_at": at("10:02:00"), "answered_at": "2026-11-02T09:00:00+00:00"},
+        },
+    }
+    actions = timing.questionnaire_actions(state, "2026-11-02T09:00:20+00:00")
+    assert timing.active_seconds(actions) == 30 + 60 + 20
+    assert timing.pauses(actions) == 1
+    assert timing.questionnaire_actions(state, None) is None  # not finished
+    assert timing.questionnaire_actions({"answers": {}}, at("10:05:00")) is None  # started before the change

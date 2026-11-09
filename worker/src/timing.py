@@ -76,6 +76,62 @@ def questionnaire_seconds(started_at: str, finished_at: str | None, question_lis
     return times
 
 
+# Active time: the time an assessment was worked on, without long pauses
+# (respondents may stop and continue another day). It is the sum of the gaps
+# between consecutive actions; a gap longer than PAUSE_LIMIT_SECONDS is a
+# pause and counts as 0. In both formats it runs from the moment the first
+# question is first shown to the respondent's last action:
+# - chatbot: from the first question (shown together with the intro when the
+#   conversation starts) over every message to the respondent's last answer;
+# - questionnaire: from the first question (shown when "Start the
+#   questionnaire" is pressed, first_question_shown_at) over the times every
+#   question was first answered and last changed, to Finish.
+PAUSE_LIMIT_SECONDS = 10 * 60
+
+
+def _gaps(timestamps: list[str]) -> list[float]:
+    ordered = sorted(timestamps, key=datetime.fromisoformat)
+    return [_seconds(a, b) for a, b in zip(ordered, ordered[1:])]
+
+
+def active_seconds(timestamps: list[str] | None) -> float | None:
+    """Sum of the gaps between consecutive actions, gaps longer than
+    PAUSE_LIMIT_SECONDS counting as 0. None when the actions are unknown."""
+    if not timestamps:
+        return None
+    return sum(gap for gap in _gaps(timestamps) if gap <= PAUSE_LIMIT_SECONDS)
+
+
+def pauses(timestamps: list[str] | None) -> int | None:
+    """How many gaps were longer than PAUSE_LIMIT_SECONDS (left out of active time)."""
+    if not timestamps:
+        return None
+    return sum(1 for gap in _gaps(timestamps) if gap > PAUSE_LIMIT_SECONDS)
+
+
+def chatbot_actions(messages: list[dict]) -> list[str] | None:
+    """The chatbot's action times: every message up to the respondent's last
+    answer. The first question has the same time as the start. None for
+    conversations without timestamps or without an answer."""
+    answers = [i for i, m in enumerate(messages) if m["role"] == "respondent"]
+    if not _timed(messages) or not answers:
+        return None
+    return [m["at"] for m in messages[:answers[-1] + 1]]
+
+
+def questionnaire_actions(state: dict, finished_at: str | None) -> list[str] | None:
+    """The questionnaire's action times: the first question shown, every
+    answer's first and last time, and Finish. None if it is not finished or
+    was started before first_question_shown_at was recorded (2026-11-09)."""
+    shown = state.get("first_question_shown_at")
+    if not shown or not finished_at:
+        return None
+    times = [shown, finished_at]
+    for answer in state["answers"].values():
+        times += [answer["first_answered_at"], answer["answered_at"]]
+    return times
+
+
 def minutes(seconds: float | None) -> float | str:
     """Seconds as minutes with two decimals, for the CSV; "" when unknown."""
     return "" if seconds is None else round(seconds / 60, 2)

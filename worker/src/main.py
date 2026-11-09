@@ -280,6 +280,18 @@ async def get_questionnaire(r: str, request: Request):
     }
 
 
+@api.post("/questionnaire/shown")
+async def first_question_shown(body: StartRequest, request: Request):
+    """Store when the first question was first shown ("Start the
+    questionnaire" pressed), only the first time. Active time starts there,
+    as in the chatbot, whose first question is shown when it starts (timing.py)."""
+    row, state, _, _ = await open_questionnaire(request, body.respondent)
+    if not state["done"] and not state.get("first_question_shown_at"):
+        state["first_question_shown_at"] = storage.now()
+        await storage.save_state(database(request), row["id"], state)
+    return {"first_question_shown_at": state.get("first_question_shown_at")}
+
+
 @api.post("/questionnaire/answer")
 async def answer_question(body: QuestionnaireAnswer, request: Request):
     """Save one answer immediately. Answers can be changed until the
