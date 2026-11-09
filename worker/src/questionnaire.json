@@ -1,9 +1,9 @@
 {
-  "version": "0.2",
+  "version": "0.10",
   "rubric_version": "0.11",
   "scoring": {
     "subdimension_score": "Each question measures one subdimension. The chosen option is the subdimension score, a whole number from 0 to 5.",
-    "dont_know": "'I don't know' gives a score of 0 and sets the flag 'insufficient_evidence', as in the chatbot.",
+    "dont_know": "'I do not know' gives a score of 0 and sets the flag 'insufficient_evidence', as in the chatbot.",
     "aggregation": "Dimension and overall scores, rounding and the report follow the same rules as the chatbot (Sections 2.4 and 2.5)."
   },
   "dimensions": [
@@ -15,34 +15,34 @@
           "items": [
             {
               "id": "Q01",
-              "question": "How do employees find the data they need for their work?",
+              "question": "How do employees in your organization typically find the data they need?",
               "options": [
                 {
-                  "text": "There is no way to find data, and nobody has seen this as a problem.",
+                  "text": "Data is very hard or impossible to find. There is no way to locate it, formal or informal, and nobody has seen this as a problem.",
                   "value": 0
                 },
                 {
-                  "text": "Everyone searches or asks around on their own; it takes a lot of effort and often fails.",
+                  "text": "Finding data takes a lot of effort, such as many inquiries or searching scattered sources, and whether it works depends on who is searching.",
                   "value": 1
                 },
                 {
-                  "text": "Within teams, people know whom to ask or keep their own lists, but this depends on specific people.",
+                  "text": "Data is usually found through informal channels, such as asking a colleague who knows it or lists kept by a team, but this depends on specific people.",
                   "value": 2
                 },
                 {
-                  "text": "There is a documented overview for the whole organization, such as a data catalog, so finding data doesn't depend on specific people.",
+                  "text": "There is a documented, organization-wide way to find data, such as a data catalog or central inventory, with standard procedures and contact points.",
                   "value": 3
                 },
                 {
-                  "text": "The overview is maintained by someone responsible and checked regularly for gaps and outdated entries.",
+                  "text": "There is an organization-wide data catalog or inventory, and someone responsible checks regularly that it is complete and up to date.",
                   "value": 4
                 },
                 {
-                  "text": "The overview is improved continuously based on how people use it and their feedback, supported by automated tools.",
+                  "text": "Search results and feedback from employees are used to make the data catalog easier to use, and new datasets are added to it automatically when they are created.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -55,34 +55,34 @@
           "items": [
             {
               "id": "Q02",
-              "question": "Who is responsible for your organization's key datasets?",
+              "question": "How is responsibility for data handled in your organization?",
               "options": [
                 {
-                  "text": "No one, and responsibility for data isn't something the organization thinks about.",
+                  "text": "There is no concept of data ownership. Nobody is responsible for any data, formally or informally, and this has not been seen as a problem.",
                   "value": 0
                 },
                 {
-                  "text": "No one clearly; someone steps in only when a problem occurs.",
+                  "text": "No one clearly owns the data. Many people use it, and someone takes responsibility only when a problem occurs, so whether data is maintained varies.",
                   "value": 1
                 },
                 {
-                  "text": "Within teams it is generally known who looks after which data, but it isn't written down and differs between teams.",
+                  "text": "Within teams, people generally know who looks after which data, usually whoever created or uses it, but this is not written down and differs between teams.",
                   "value": 2
                 },
                 {
-                  "text": "Each key dataset has a formally assigned owner, recorded according to one standard for the whole organization.",
+                  "text": "Every key dataset has an owner, formally assigned and documented according to one standard for the whole organization and tied to roles rather than people.",
                   "value": 3
                 },
                 {
-                  "text": "Ownership is reviewed regularly, and datasets without an owner or owners who have left are found and fixed.",
+                  "text": "Owners are formally assigned and documented, and ownership is reviewed regularly, so datasets without an owner or owners who have left are found and fixed.",
                   "value": 4
                 },
                 {
-                  "text": "Ownership is improved continuously and built into processes, for example every new dataset gets an owner when it is created.",
+                  "text": "Assigning an owner is built into how data is created, so every new dataset has an owner from the start, and the rules change when reviews show problems.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -95,34 +95,34 @@
           "items": [
             {
               "id": "Q03",
-              "question": "What is the quality of your data when someone wants to use it for analysis or AI?",
+              "question": "How is data quality handled in your organization, and how usable is the data for analysis or AI?",
               "options": [
                 {
-                  "text": "Data quality isn't managed; the data can't be used without being rebuilt.",
+                  "text": "Data quality is not managed and has not been seen as a problem. Data is so inconsistent that it cannot be used without being rebuilt.",
                   "value": 0
                 },
                 {
-                  "text": "Individuals fix problems when they notice them; the data needs a lot of manual cleaning every time.",
+                  "text": "There are no quality rules. Individuals fix problems when they notice them, usually for one task, and data needs extensive manual cleaning before every use.",
                   "value": 1
                 },
                 {
-                  "text": "Some teams have their own checks, but quality differs between teams and combining data needs a lot of cleaning.",
+                  "text": "Some teams have informal rules and repeat basic checks on their own data, but quality differs between teams, and combining data from different systems needs significant cleaning.",
                   "value": 2
                 },
                 {
-                  "text": "Documented quality rules apply across the organization, and the data can be used with limited preparation.",
+                  "text": "Documented quality rules apply across the whole organization, with assigned responsibilities, so data from different systems is consistent and can be used with limited preparation.",
                   "value": 3
                 },
                 {
-                  "text": "Quality is measured against defined thresholds, rules are enforced in the systems, and deviations are corrected.",
+                  "text": "Organization-wide quality rules are enforced through system controls such as required fields, quality is measured against defined targets, and problems are found and corrected.",
                   "value": 4
                 },
                 {
-                  "text": "Measurement results are used to improve the rules continuously, recurring problems are fixed at their source, and monitoring is largely automated.",
+                  "text": "Recurring quality problems are fixed at their source instead of being cleaned up each time, and most checks run automatically. Data can be used for analysis or AI without extra preparation.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -143,31 +143,31 @@
               "question": "How do people in your organization approach AI, in their attitude and in their daily work?",
               "options": [
                 {
-                  "text": "AI isn't used or discussed, and employees have no access to AI tools.",
+                  "text": "AI is not used or discussed. Employees have no access to AI tools, and openness to AI has not been seen as something that needs attention.",
                   "value": 0
                 },
                 {
-                  "text": "A few individuals try AI tools on their own without guidance; most lack knowledge or confidence.",
+                  "text": "A few individuals try AI tools on their own, often free versions, without permission or guidance; most employees lack the knowledge or confidence to use AI.",
                   "value": 1
                 },
                 {
-                  "text": "Some teams use AI regularly and encourage experimenting, while others are skeptical or uninvolved.",
+                  "text": "Some teams or departments use AI regularly for specific purposes and encourage experimenting, while others remain skeptical or uninvolved, depending on individual managers.",
                   "value": 2
                 },
                 {
-                  "text": "The organization supports AI across departments with shared guidelines, and employees are invited to propose ideas.",
+                  "text": "AI is part of regular work across departments, with approved tools and shared guidelines, and employees are invited to propose and test ideas for using AI.",
                   "value": 3
                 },
                 {
-                  "text": "AI adoption and attitudes are tracked, for example through usage data or surveys, and low adoption is addressed.",
+                  "text": "AI is used across the organization, and its adoption and employees' attitudes are tracked, for example through usage data or surveys, so that low adoption is addressed.",
                   "value": 4
                 },
                 {
-                  "text": "Experimenting with AI is part of everyday work, and lessons from successes and failures are shared and used to improve.",
+                  "text": "Trying out AI is a normal part of everyday work. Employees regularly propose and test new ideas and share with others what worked and what did not.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -183,11 +183,11 @@
               "question": "Who in your organization has the skills to develop or implement AI?",
               "options": [
                 {
-                  "text": "No one inside or outside the organization, and the need hasn't been recognized.",
+                  "text": "No one inside or outside the organization, and the need has not been recognized.",
                   "value": 0
                 },
                 {
-                  "text": "Only a few self-taught individuals; AI isn't part of anyone's role.",
+                  "text": "Only a few self-taught individuals; AI is not part of anyone's role.",
                   "value": 1
                 },
                 {
@@ -203,11 +203,11 @@
                   "value": 4
                 },
                 {
-                  "text": "The organization continuously improves how it attracts, develops and keeps AI talent, with career paths for AI roles.",
+                  "text": "There are career paths for AI roles, and the way the organization hires, develops and keeps AI experts is adapted based on what works.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -220,34 +220,34 @@
           "items": [
             {
               "id": "Q06",
-              "question": "How do employees learn to work with AI?",
+              "question": "How do employees in your organization learn to work with AI?",
               "options": [
                 {
-                  "text": "There is no AI learning, and the need hasn't been considered.",
+                  "text": "There is no AI training or support. Nobody has considered that employees might need it, so no one plans or offers any learning about AI.",
                   "value": 0
                 },
                 {
-                  "text": "Employees learn on their own, without training, guidance or sharing.",
+                  "text": "Employees learn about AI on their own, for example from online videos or by trying tools. There is no training, guidance or sharing of experience.",
                   "value": 1
                 },
                 {
-                  "text": "Occasional workshops or knowledge sharing happen in some teams, but they aren't organized systematically.",
+                  "text": "Some teams have occasional learning, for example a workshop or a colleague showing how they use ChatGPT. It is not organized for the whole organization.",
                   "value": 2
                 },
                 {
-                  "text": "A structured AI training programme with practical guidance is available to all employees.",
+                  "text": "All employees have a structured AI training program, such as online courses for their role, and practical guides for the approved tools. Someone is responsible for it.",
                   "value": 3
                 },
                 {
-                  "text": "Participation and the effect of training are tracked, and gaps are corrected.",
+                  "text": "There is a structured AI training program, and its outcomes are measured. For example, participation and skills before and after training are tracked, and gaps are fixed.",
                   "value": 4
                 },
                 {
-                  "text": "Training is improved continuously based on feedback and new AI developments, and learning is part of daily work.",
+                  "text": "Learning about AI is part of daily work, for example through an AI community or regular sharing sessions, and courses are updated whenever new AI tools appear.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -268,7 +268,7 @@
               "question": "Has your organization defined what it wants to achieve with AI?",
               "options": [
                 {
-                  "text": "No, and leadership isn't interested in defining it.",
+                  "text": "No, and leadership is not interested in defining it.",
                   "value": 0
                 },
                 {
@@ -288,11 +288,11 @@
                   "value": 4
                 },
                 {
-                  "text": "The ambition is refined continuously based on results and new developments and actively shapes the long-term direction.",
+                  "text": "The AI ambition actively shapes the organization's long-term direction and is updated whenever results or new developments in AI call for it.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -308,7 +308,7 @@
               "question": "How is AI connected to your organization's business goals?",
               "options": [
                 {
-                  "text": "It isn't; AI is not considered, or only as a technical topic.",
+                  "text": "It is not; AI is not considered, or only as a technical topic.",
                   "value": 0
                 },
                 {
@@ -328,11 +328,11 @@
                   "value": 4
                 },
                 {
-                  "text": "AI objectives are refined continuously and built into strategic planning and decisions.",
+                  "text": "AI objectives are part of every strategic planning cycle, and new targets are set based on what earlier AI projects achieved.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -348,7 +348,7 @@
               "question": "How does your organization decide which AI ideas to pursue?",
               "options": [
                 {
-                  "text": "It doesn't; no one has considered where AI could bring value.",
+                  "text": "It does not; no one has considered where AI could bring value.",
                   "value": 0
                 },
                 {
@@ -368,11 +368,11 @@
                   "value": 4
                 },
                 {
-                  "text": "The selection process is improved continuously based on past results, and new opportunities are searched for systematically.",
+                  "text": "Lessons from past AI projects are used to sharpen how ideas are selected, and the organization actively looks for new places where AI could help.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -393,11 +393,11 @@
               "question": "How well do your organization's systems support the use of AI?",
               "options": [
                 {
-                  "text": "Systems are outdated or isolated and can't support AI, and this hasn't been considered.",
+                  "text": "Systems are outdated or isolated and cannot support AI, and this has not been considered.",
                   "value": 0
                 },
                 {
-                  "text": "There are only basic services such as email and file storage; AI is used only through public tools, and data is moved by hand.",
+                  "text": "There are only basic services provided by the organization; AI is used only through public tools, and data is moved by hand.",
                   "value": 1
                 },
                 {
@@ -413,11 +413,11 @@
                   "value": 4
                 },
                 {
-                  "text": "The environment is improved continuously, with automated deployment and scaling of AI.",
+                  "text": "AI solutions can be deployed and scaled automatically, and the environment is adapted as new AI needs appear.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -433,7 +433,7 @@
               "question": "How does your organization obtain AI tools and solutions?",
               "options": [
                 {
-                  "text": "It hasn't obtained any and hasn't considered how it would.",
+                  "text": "It has not obtained any and has not considered how it would.",
                   "value": 0
                 },
                 {
@@ -453,11 +453,11 @@
                   "value": 4
                 },
                 {
-                  "text": "The approach is improved continuously, and build-or-buy decisions are reassessed as needs change.",
+                  "text": "Experience with vendors and tools is used to update the selection criteria, and decisions to build or buy are reviewed as needs change.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
@@ -470,34 +470,34 @@
           "items": [
             {
               "id": "Q12",
-              "question": "How does your organization keep its use of AI secure and able to grow?",
+              "question": "How does your organization protect its data when employees use AI tools?",
               "options": [
                 {
-                  "text": "There are no controls; anyone may share sensitive data with any AI tool.",
+                  "text": "There are no rules for protecting data when AI is used. Anyone can enter confidential or personal data into any AI tool, and nobody sees this as a risk.",
                   "value": 0
                 },
                 {
-                  "text": "A few people are careful on their own, but there are no rules, and AI stays in individual experiments.",
+                  "text": "A few people protect sensitive data on their own, for example by not pasting customer data into AI tools. There are no rules, and access to data is not controlled.",
                   "value": 1
                 },
                 {
-                  "text": "Some teams have controls and test their AI, but inconsistently, and pilots rarely spread beyond the team.",
+                  "text": "Some teams have their own rules, for example a list of allowed AI tools or limits on who can see certain data. Other teams have none, and nobody checks the rules.",
                   "value": 2
                 },
                 {
-                  "text": "Organization-wide rules control which tools may access which data, AI is tested before use, and there is a standard way to roll out pilots.",
+                  "text": "An organization-wide policy defines which data may be used in which AI tools. Data is classified, for example as public, internal or confidential, and people get access only to what they need.",
                   "value": 3
                 },
                 {
-                  "text": "AI systems in use are monitored and audited regularly, and incidents are detected and addressed.",
+                  "text": "Access to data and the use of AI tools are reviewed regularly, for example who accessed which data and whether AI use meets legal requirements such as GDPR. Problems are fixed.",
                   "value": 4
                 },
                 {
-                  "text": "Controls are improved continuously based on audits and new threats, and monitoring is largely automated.",
+                  "text": "Lessons from reviews, incidents and new regulations are used to update the security rules. Monitoring is largely automated, for example alerts when sensitive data is sent to an AI tool.",
                   "value": 5
                 },
                 {
-                  "text": "I don't know",
+                  "text": "I do not know",
                   "value": 0,
                   "dont_know": true
                 }
