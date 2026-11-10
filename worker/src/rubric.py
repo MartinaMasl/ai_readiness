@@ -6,7 +6,9 @@ as it is and never rewrites it.
 
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # rubric.json sits next to this file. wrangler.jsonc bundles it into the Worker.
 RUBRIC_PATH = Path(__file__).parent / "rubric.json"
@@ -21,7 +23,13 @@ def _check_all_levels(value: dict) -> dict:
     return value
 
 
-class Rules(BaseModel):
+class RubricPart(BaseModel):
+    """Every part of the rubric refuses keys it does not know, so a new rule
+    or a misspelt key stops the Worker at startup instead of being ignored."""
+    model_config = ConfigDict(extra="forbid")
+
+
+class Rules(RubricPart):
     score_values: str
     max_follow_ups: int  # per subdimension
     max_follow_ups_per_dimension: int
@@ -33,18 +41,19 @@ class Rules(BaseModel):
     insufficient_evidence: str
     not_applicable: str
     language: str  # how questions and replies are worded
+    question_style: str  # how concrete and simple every question must be
     transitions: str  # how the model moves to a new topic
     # Opening phrases for a new topic, chosen in turn by the code (flow.py);
     # "" means no transition phrase.
     transition_phrases: list[str]
 
 
-class ScaleLevel(BaseModel):
+class ScaleLevel(RubricPart):
     name: str
     description: str
 
 
-class Criterion(BaseModel):
+class Criterion(RubricPart):
     id: str
     description: str
     look_for: str
@@ -52,18 +61,39 @@ class Criterion(BaseModel):
     not_applicable_if: str | None = None
 
 
-class Subdimension(BaseModel):
+class Example(RubricPart):
+    """An example by the author of how the chatbot should explain or ask,
+    given to the check prompt as a model. A "clarification" has the
+    respondent's question and the chatbot's answer; a "follow_up" has a
+    question to avoid, a better one, and why."""
+    type: Literal["clarification", "follow_up"]
+    respondent: str | None = None
+    chatbot: str | None = None
+    avoid: str | None = None
+    better: str | None = None
+    why: str | None = None
+
+    @model_validator(mode="after")
+    def _fields_of_its_type(self):
+        needed = ["respondent", "chatbot"] if self.type == "clarification" else ["avoid", "better", "why"]
+        given = [f for f in ["respondent", "chatbot", "avoid", "better", "why"] if getattr(self, f)]
+        if sorted(given) != sorted(needed):
+            raise ValueError(f"an example of type {self.type!r} needs exactly {needed}, got {given}")
+        return self
+
+
+class Subdimension(RubricPart):
     name: str
     definition: str
     opening_question: str
     criteria: list[Criterion]
     levels: dict[int, str]
-    examples: list = []
+    examples: list[Example] = []
 
     _levels_complete = field_validator("levels")(_check_all_levels)
 
 
-class Dimension(BaseModel):
+class Dimension(RubricPart):
     name: str
     definition: str
     report_levels: dict[int, str]
@@ -72,7 +102,7 @@ class Dimension(BaseModel):
     _levels_complete = field_validator("report_levels")(_check_all_levels)
 
 
-class Rubric(BaseModel):
+class Rubric(RubricPart):
     version: str
     rules: Rules
     scale: dict[int, ScaleLevel]

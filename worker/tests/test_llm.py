@@ -156,6 +156,7 @@ def test_check_prompt_contains_levels_and_follow_up_rules():
         assert text in prompt
     assert RUBRIC.rules.follow_up_purpose in prompt and RUBRIC.rules.not_applicable in prompt
     assert RUBRIC.rules.language in prompt and RUBRIC.rules.transitions in prompt
+    assert RUBRIC.rules.question_style in prompt
 
 
 def test_score_to_log_has_the_log_shape():
@@ -274,3 +275,21 @@ def test_check_prompt_gets_the_transition_phrase_and_the_end_of_an_area():
     prompt = llm.check_prompt(template, RUBRIC, SUB, MESSAGES, new_area, [])
     assert "Transition phrase: none" in prompt
     assert 'starts a new area, "People"' in prompt and 'The area "Data" has just ended' in prompt
+
+
+def test_check_prompt_contains_the_examples_of_this_topic_and_of_the_next():
+    _, template = llm.load_prompt("check")
+    with_examples = [s for s in SUBS if s.examples]
+    talent = next(s for s in SUBS if s.name == "Talent")
+    for sub in with_examples:
+        prompt = llm.check_prompt(template, RUBRIC, sub, MESSAGES, None, [])
+        for e in sub.examples:
+            assert all(text in prompt for text in [e.respondent, e.chatbot, e.avoid, e.better, e.why] if text)
+    prompt = llm.check_prompt(template, RUBRIC, SUBS[0], MESSAGES, dict(NEXT_TOPIC, sub=talent), [])
+    assert "Examples for this topic:\n- Respondent asks: Involved in what?" in prompt
+    assert "Follow-up to avoid: " + talent.examples[1].avoid in prompt
+
+
+def test_a_topic_without_examples_says_none():
+    sub = next(s for s in SUBS if not s.examples)
+    assert llm.format_examples(sub) == "None."

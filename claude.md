@@ -88,8 +88,10 @@ discussed in the thesis as part of the chatbot format):
   or two missing criteria. It does not suggest an answer and does not
   assume facts the respondent did not state.
 - A question about the meaning of the question or a term is answered
-  using the subdimension `definition` and the criteria's `look_for`, in
-  the model's own words.
+  using the subdimension `definition`, the criteria's `look_for` and the
+  subdimension's `examples` (written by the author; the check also gets
+  the next subdimension's examples), in the model's own words; examples
+  are adapted, never copied.
 - Follow-ups and explanations may give short examples of what kind of
   answer is meant, taken from `look_for`. They always offer several
   alternatives covering different situations, including the absence of
@@ -107,7 +109,9 @@ discussed in the thesis as part of the chatbot format):
 - Only the very first question is fixed. A `next_question` starts with
   the transition phrase the code gives it (rule `transitions`), and asks
   about the same thing as the next subdimension's core question, not
-  more and not less; one question, about that subdimension only. The
+  more and not less; one question, about that subdimension only. If the
+  respondent already said something about it earlier in the dimension,
+  the question mentions that briefly and builds on it. The
   rules above (no suggested answers, levels, rubric or advice) apply to
   it too.
 

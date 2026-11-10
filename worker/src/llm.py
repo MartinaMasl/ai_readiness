@@ -94,6 +94,19 @@ def format_criteria(sub: Subdimension) -> str:
     return "\n".join(lines)
 
 
+def format_examples(sub: Subdimension) -> str:
+    """The author's examples of how to explain or ask about this subdimension."""
+    if not sub.examples:
+        return "None."
+    parts = []
+    for e in sub.examples:
+        if e.type == "clarification":
+            parts.append(f"- Respondent asks: {e.respondent}\n  Chatbot: {e.chatbot}")
+        else:
+            parts.append(f"- Follow-up to avoid: {e.avoid}\n  Better: {e.better}\n  Why: {e.why}")
+    return "\n".join(parts)
+
+
 def format_rules(rules: list[str]) -> str:
     return "\n".join(f"- {rule}" for rule in rules)
 
@@ -136,7 +149,8 @@ def format_next_topic(next_topic: dict | None) -> str:
         f"Definition: {sub.definition}\n"
         f"Core question: {sub.opening_question}\n"
         f"Transition phrase: {phrase}\n"
-        f"{dimension}"
+        f"{dimension}\n"
+        f"Examples for this topic:\n{format_examples(sub)}"
     )
 
 
@@ -152,8 +166,9 @@ def check_prompt(template: str, rubric: Rubric, sub: Subdimension, messages: lis
         "rules": format_rules([
             rubric.rules.follow_up_purpose, rubric.rules.not_applicable, rubric.rules.plans,
             # How every question and reply the check writes is worded, next_question included.
-            rubric.rules.language, rubric.rules.transitions,
+            rubric.rules.language, rubric.rules.question_style, rubric.rules.transitions,
         ]),
+        "examples": format_examples(sub),
         "transcript": format_transcript(messages),
     })
 
