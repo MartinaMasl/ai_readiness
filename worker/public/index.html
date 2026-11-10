@@ -18,6 +18,10 @@
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }  /* hidden always wins over a display rule */
+  /* The overview stays invisible until its data has arrived, so the greeting
+     ("Welcome" or "Welcome back") and the steps appear together, without a jump. */
+  #main { transition: opacity .2s ease; }
+  #main.loading { opacity: 0; }
   body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5; }
   button { font: inherit; }
   .mono { font-family: 'IBM Plex Mono', monospace; }
@@ -87,10 +91,10 @@
   <div><span class="brand-title">AI Readiness Assessment</span><span class="brand-sub">Diploma thesis research</span></div>
 </header>
 
-<main id="main">
+<main id="main" class="loading">
   <div>
     <span class="eyebrow mono">Your assessment</span>
-    <h1 id="greeting">Welcome</h1>
+    <h1 id="greeting">&nbsp;</h1>
     <p class="lead" id="lead">This study assesses how ready your organization is for AI in two different ways, a conversation and a questionnaire, and asks which one worked better for you. Please complete the parts in the order shown. Each takes about 10 to 15 minutes.</p>
   </div>
 
@@ -128,6 +132,7 @@ function description(key, topics) {
 const date = iso => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 
 function fail(message) {
+  document.getElementById('main').classList.remove('loading');
   document.getElementById('main').innerHTML = '';
   const p = document.createElement('p');
   p.className = 'error';
@@ -140,6 +145,7 @@ function render(data) {
   document.getElementById('greeting').textContent = data.complete ? 'Thank you' : started ? 'Welcome back' : 'Welcome';
   document.getElementById('complete').hidden = !data.complete;
   document.getElementById('consent').hidden = data.consent;
+  document.getElementById('main').classList.remove('loading');
 
   const list = document.getElementById('steps');
   list.innerHTML = '';
@@ -200,7 +206,9 @@ function render(data) {
 
 async function load() {
   if (!token) { fail('This study can only be opened with your personal link. Please use the link you received.'); return; }
-  const response = await fetch('/api/study?r=' + encodeURIComponent(token));
+  let response;
+  try { response = await fetch('/api/study?r=' + encodeURIComponent(token)); }
+  catch (error) { fail('The overview could not be loaded. Please check your connection and reload the page.'); return; }
   if (response.status === 403) { fail('This link is not valid. Please use the personal link you received.'); return; }
   if (!response.ok) { fail('The overview could not be loaded. Please reload the page.'); return; }
   render(await response.json());
