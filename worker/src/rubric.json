@@ -1,5 +1,5 @@
 {
-  "version": "0.13",
+  "version": "0.14",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
