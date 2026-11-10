@@ -1,9 +1,9 @@
 {
-  "version": "0.14",
+  "version": "0.15",
   "rules": {
     "score_values": "Each subdimension receives one whole number from 0 to 5.",
     "max_follow_ups": 1,
-    "max_follow_ups_per_dimension": 3,
+    "max_follow_ups_per_dimension": 2,
     "max_redirects": 2,
     "max_clarifications": 3,
     "follow_up_purpose": "Ask a follow-up only if the missing information could change the level. One follow-up may ask about two missing criteria only if they fit naturally into one simple question; otherwise ask only about the criterion that matters most.",
